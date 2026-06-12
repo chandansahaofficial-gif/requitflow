@@ -1,0 +1,114 @@
+import { NextResponse } from 'next/server';
+import { getRunStatus, getDatasetItems } from '@/services/apify';
+import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
+
+export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const apifyToken = process.env.APIFY_API_TOKEN;
+  if (!apifyToken) {
+    return NextResponse.json({ error: 'Apify token missing' }, { status: 400 });
+  }
+
+  const { runId, location, country } = await req.json();
+  if (!runId) return NextResponse.json({ error: 'runId is required' }, { status: 400 });
+
+  try {
+    const runStatus = await getRunStatus(apifyToken, runId);
+    const status = runStatus.data.status;
+
+    if (status !== 'SUCCEEDED') {
+      return NextResponse.json({ status });
+    }
+
+    // If succeeded, fetch the results
+    const datasetId = runStatus.data.defaultDatasetId;
+    const items = await getDatasetItems(apifyToken, datasetId);
+
+    // Filter out items without a name
+    const validItems = items.filter((item: any) => item.title);
+
+    // Save leads to database and generate AI insights concurrently
+    const createdLeads = [];
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    const openrouterModel = process.env.OPENROUTER_MODEL || "google/gemini-1.5-pro";
+
+    const processLead = async (item: any) => {
+      // Basic scoring logic
+      let score = 0;
+      if (item.reviewsCount > 50) score += 20;
+      if (item.rating && item.rating >= 4.0) score += 20;
+      if (item.website) score += 30;
+      if (item.phone || item.phoneUnformatted) score += 30;
+
+      let tier = "Cold";
+      if (score >= 80) tier = "Hot";
+      else if (score >= 50) tier = "Warm";
+
+      // Generate AI Insight
+      let aiInsight = "Potential recruitment client based on public business presence and available contact details.";
+      if (openrouterKey) {
+        try {
+          const prompt = `Based on this company name (${item.title}), category (${item.categoryName || 'Unknown'}), and rating (${item.rating || 'N/A'}), write exactly one brief sentence on why a recruitment agency should contact them to offer hiring/staffing services. Do not include quotes, just the sentence.`;
+          
+          const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openrouterKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://recruitflow.ai",
+              "X-Title": "RecruitFlow AI"
+            },
+            body: JSON.stringify({
+              model: openrouterModel,
+              messages: [{ role: "user", content: prompt }]
+            })
+          });
+          const orData = await orRes.json();
+          if (orData.choices && orData.choices[0] && orData.choices[0].message) {
+            aiInsight = orData.choices[0].message.content.trim();
+          }
+        } catch (err) {
+          console.error("OpenRouter generation failed for lead", item.title, err);
+        }
+      }
+
+      const lead = await prisma.lead.create({
+        data: {
+          userId: user.id,
+          businessName: item.title,
+          phone: item.phone || item.phoneUnformatted || null,
+          website: item.website || null,
+          address: item.address || item.street || null,
+          rating: item.totalScore || item.rating || null,
+          reviewCount: item.reviewsCount || null,
+          googleMapsLink: item.url || null,
+          category: item.categoryName || null,
+          country: country || null,
+          location: location || item.city || null,
+          leadScore: score,
+          leadTier: tier,
+          source: 'Apify',
+          status: 'New',
+          aiInsight: aiInsight,
+        }
+      });
+      return lead;
+    };
+
+    // Run processing concurrently in batches of 10 to not overwhelm OpenRouter
+    for (let i = 0; i < validItems.length; i += 10) {
+      const batch = validItems.slice(i, i + 10);
+      const batchResults = await Promise.all(batch.map(processLead));
+      createdLeads.push(...batchResults);
+    }
+
+    return NextResponse.json({ status: 'SUCCEEDED', leads: createdLeads });
+
+  } catch (error: any) {
+    console.error('Apify check error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

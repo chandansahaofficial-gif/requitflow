@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeadRadar — AI Lead Generation Dashboard</title>
+  <meta name="description" content="Premium AI lead generation dashboard for global businesses." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link id="fontLink" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Montserrat:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;700&family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans+Arabic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-wrap">
+      <div class="header-logo-wrap" style="display:flex;align-items:center;gap:10px;">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+              <path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="logo-name">LeadRadar</span>
+        </a>
+      </div>
+
+      <!-- Welcome message -->
+      <div class="header-welcome" id="headerWelcome">
+        <div class="welcome-main" id="welcomeMain">Welcome to LeadRadar</div>
+        <div class="welcome-sub" id="welcomeSub">Let's find your next best leads today.</div>
+      </div>
+
+      <!-- Right side -->
+      <div class="header-right">
+        <div class="status-pill" id="statusPill">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Ready</span>
+        </div>
+        <!-- Avatar + dropdown -->
+        <div style="position:relative;">
+          <div class="avatar-btn" id="avatarBtn" onclick="toggleProfileDropdown()">
+            <span id="avatarInitials">U</span>
+          </div>
+          <div class="profile-dropdown" id="profileDropdown">
+            <div class="dropdown-header">
+              <div class="dropdown-name" id="dropdownName">User</div>
+              <div class="dropdown-email" id="dropdownEmail">—</div>
+            </div>
+            <button class="dropdown-item" onclick="showSection('settings-section'); closeProfileDropdown()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span data-i18n="dropdown.settings">Settings</span>
+            </button>
+            <button class="dropdown-item" onclick="window.location.href='/pricing.html'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Upgrade Plan</span>
+            </button>
+            <button class="dropdown-item danger" onclick="handleLogout()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span data-i18n="dropdown.logout">Sign Out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- HEADER NAV -->
+  <nav class="header-nav">
+    <div class="sidebar-logo">
+      <a href="index.html" class="logo">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="logo-name">LeadRadar</span>
+      </a>
+    </div>
+    <div class="header-nav-inner">
+      <button class="nav-item active" id="nav-dashboard" onclick="showSection('dashboard-section')">
+        <span class="nav-icon">
+          <svg class="nav-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+        </span>
+        <span data-i18n="nav.dashboard">Dashboard</span>
+      </button>
+      <button class="nav-item" id="nav-leads" onclick="showSection('leads-section')">
+        <span class="nav-icon">
+          <svg class="nav-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+        </span>
+        <span data-i18n="nav.leads">Leads</span>
+      </button>
+      <button class="nav-item" id="nav-companies" onclick="showSection('companies-section')">
+        <span class="nav-icon">
+          <svg class="nav-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="16"></line><line x1="15" y1="22" x2="15" y2="16"></line><line x1="9" y1="16" x2="15" y2="16"></line><path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M12 6h.01M12 10h.01"></path></svg>
+        </span>
+        <span data-i18n="nav.companies">Companies</span>
+      </button>
+      <button class="nav-item" id="nav-analytics" onclick="showSection('analytics-section')">
+        <span class="nav-icon">
+          <svg class="nav-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path></svg>
+        </span>
+        <span data-i18n="nav.analytics">Analytics</span>
+      </button>
+      <button class="nav-item" id="nav-campaigns" onclick="showSection('campaigns-section')">
+        <span class="nav-icon">
+          <svg class="nav-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </span>
+        <span data-i18n="nav.campaigns">Campaigns</span>
+      </button>
+      <button class="nav-item" id="nav-settings" onclick="openSettingsDrawer()">
+        <span class="nav-icon">
+          <svg class="nav-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </span>
+        <span data-i18n="nav.settings">Settings</span>
+      </button>
+    </div>
+  </nav>
+  <!-- MAIN PAGE -->
+  <div class="page" id="mainPage">
+    <!-- MAIN CONTENT -->
+    <main class="results" id="resultsPanel">
+
+      <!-- ── LEADS SECTION ── -->
+      <div class="page-section" id="leads-section">
+        <div class="leads-layout">
+          <!-- Sidebar Form Area -->
+          <div class="leads-sidebar" id="sidebarFormArea">
+            <div class="leads-form-area">
+              <form id="configForm">
+                <!-- Lead Goal -->
+                <div class="field">
+                  <label for="searchSource" data-i18n="sidebar.leadGoal">Lead Goal</label>
+                  <select id="searchSource">
+                    <option value="linkedin">Find Professionals (LinkedIn)</option>
+                    <option value="google">Find Local Businesses (Google Maps)</option>
+                    <option value="jobs">Find Hiring Companies (Job Postings)</option>
+                    <option value="employees">Find Candidates (Resumes/Profiles)</option>
+                  </select>
+                </div>
+
+                <!-- Keyword -->
+                <div class="field">
+                  <label for="businessType" id="bizTypeLabel" data-i18n="sidebar.keyword">Job Title / Keyword</label>
+                  <input type="text" id="businessType" placeholder="e.g. Founder, Marketing Manager…" required />
+                  <div class="tags" id="tagsContainer">
+                    <button type="button" class="tag" data-value="founder">Founder</button>
+                    <button type="button" class="tag" data-value="ceo">CEO</button>
+                    <button type="button" class="tag" data-value="software engineer">Engineer</button>
+                    <button type="button" class="tag" data-value="sales director">Sales</button>
+                    <button type="button" class="tag" data-value="marketing manager">Marketing</button>
+                    <button type="button" class="tag" data-value="recruiter">Recruiter</button>
+                    <button type="button" class="tag" data-value="real estate broker">Real Estate</button>
+                  </div>
+                </div>
+
+                <!-- Location -->
+                <div class="field">
+                  <label for="location" data-i18n="sidebar.location">Location</label>
+                  <input type="text" id="location" placeholder="e.g. New York, London, Dubai…" required />
+                </div>
+
+                <!-- Country + Max Results -->
+                <div class="field-row">
+                  <div class="field">
+                    <label for="countryCode" data-i18n="sidebar.country">Country</label>
+                    <select id="countryCode">
+                      <option value="us">United States</option>
+                      <option value="gb">United Kingdom</option>
+                      <option value="ca">Canada</option>
+                      <option value="au">Australia</option>
+                      <option value="in">India</option>
+                      <option value="de">Germany</option>
+                      <option value="fr">France</option>
+                      <option value="ae">UAE</option>
+                      <option value="sg">Singapore</option>
+                      <option value="br">Brazil</option>
+                      <option value="jp">Japan</option>
+                      <option value="kr">South Korea</option>
+                      <option value="cn">China</option>
+                      <option value="ru">Russia</option>
+                      <option value="es">Spain</option>
+                      <option value="it">Italy</option>
+                      <option value="nl">Netherlands</option>
+                      <option value="sa">Saudi Arabia</option>
+                      <option value="nz">New Zealand</option>
+                      <option value="za">South Africa</option>
+                      <option value="ng">Nigeria</option>
+                      <option value="id">Indonesia</option>
+                      <option value="my">Malaysia</option>
+                      <option value="th">Thailand</option>
+                      <option value="vn">Vietnam</option>
+                      <option value="tr">Turkey</option>
+                      <option value="mx">Mexico</option>
+                      <option value="ar">Argentina</option>
+                      <option value="eg">Egypt</option>
+                      <option value="pk">Pakistan</option>
+                      <option value="bd">Bangladesh</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="maxResults" data-i18n="sidebar.maxResults">Max Results</label>
+                    <input type="number" id="maxResults" value="20" min="1" max="200" />
+                  </div>
+                </div>
+
+                <!-- Lead Tier -->
+                <div class="field">
+                  <label data-i18n="sidebar.tierFilter">Lead Tier Filter</label>
+                  <div class="tier-row" id="tierSelector">
+                    <button type="button" class="tier-btn active" data-tier="All" data-i18n="tiers.all">All</button>
+                    <button type="button" class="tier-btn" data-tier="Hot">Hot</button>
+                    <button type="button" class="tier-btn" data-tier="Warm">Warm</button>
+                    <button type="button" class="tier-btn" data-tier="Cold">Cold</button>
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:10px;align-items:center;">
+                  <button class="btn btn-outline" id="addToCampaignBtn" style="display:none;" onclick="openAddToCampaignModal()">Add to Campaign</button>
+                </div>  <button type="submit" class="generate-btn" id="generateBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" id="btnIcon">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                    <span id="btnLabel" data-i18n="sidebar.generateLeads">Generate Leads</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Main Results Area -->
+          <div class="leads-main">
+            <!-- Empty -->
+            <div class="state-wrap hidden" id="emptyState"></div>
+
+            <!-- Loading -->
+            <div class="state-wrap hidden" id="loadingState">
+              <div class="cube-loader">
+                <div class="cube cube1"></div>
+                <div class="cube cube2"></div>
+                <div class="cube cube3"></div>
+                <div class="cube cube4"></div>
+              </div>
+              <h3 id="loadingTitle" style="margin-top:28px;" data-i18n="loading.title">Scanning…</h3>
+              <p id="loadingSubtitle" data-i18n="loading.subtitle">This may take 30–90 seconds.</p>
+            </div>
+
+            <!-- Error -->
+            <div class="state-wrap hidden" id="errorState">
+              <div class="state-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+              <h3 data-i18n="error.title">Something went wrong</h3>
+              <p id="errorMessage">An error occurred.</p>
+              <button class="retry-btn" id="retryBtn" data-i18n="error.retry">Try Again</button>
+            </div>
+
+            <!-- Results -->
+            <div class="hidden" id="resultsContent">
+              <!-- Stats bar -->
+              <div class="stats-bar" id="statsGrid">
+                <div class="stat">
+                  <span class="stat-num" id="totalCount">0</span>
+                  <span class="stat-lbl" data-i18n="stats.total">Total</span>
+                </div>
+                <div class="stat stat-hot">
+                  <span class="stat-num" id="hotCount">0</span>
+                  <span class="stat-lbl">Hot</span>
+                </div>
+                <div class="stat stat-warm">
+                  <span class="stat-num" id="warmCount">0</span>
+                  <span class="stat-lbl">Warm</span>
+                </div>
+                <div class="stat stat-cold">
+                  <span class="stat-num" id="coldCount">0</span>
+                  <span class="stat-lbl">Cold</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-num" id="phoneCount">0</span>
+                  <span class="stat-lbl" id="phoneLbl">Phones</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-num" id="webCount">0</span>
+                  <span class="stat-lbl" id="webLbl">Websites</span>
+                </div>
+              </div>
+
+              <!-- Toolbar -->
+              <div class="toolbar">
+                <div class="toolbar-left">
+                  <div class="filter-group" id="filterChips">
+                    <button class="fpill active" data-filter="All" data-i18n="tiers.all">All</button>
+                    <button class="fpill" data-filter="Hot">Hot</button>
+                    <button class="fpill" data-filter="Warm">Warm</button>
+                    <button class="fpill" data-filter="Cold">Cold</button>
+                  </div>
+                </div>
+                <div class="toolbar-right">
+                  <input type="text" id="searchLeads" class="search-input" placeholder="Search…" />
+                  <button class="csv-btn" id="exportCSV">Export CSV</button>
+                </div>
+              </div>
+
+              <!-- Table -->
+              <div class="table-wrap">
+                <table class="leads-table">
+                  <thead id="tableHead"></thead>
+                  <tbody id="leadsGrid"></tbody>
+                </table>
+              </div>
+
+              <div class="no-results hidden" id="noFilterResults">No leads match this filter.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- ── DASHBOARD SECTION ── -->
+      <div class="page-section active" id="dashboard-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title" data-i18n="nav.dashboard">Dashboard</div>
+            <div class="section-sub" data-i18n="dashboard.startSearch">Start by generating your first leads</div>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="dash-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg></div><div class="dash-card-num" id="dashTotal">0</div>
+            <div class="dash-card-label" data-i18n="dashboard.totalLeads">Total Leads</div>
+          </div>
+          <div class="dash-card hot-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg></div><div class="dash-card-num" id="dashHot">0</div>
+            <div class="dash-card-label" data-i18n="dashboard.hotLeads">Hot Leads</div>
+          </div>
+          <div class="dash-card warm-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></div><div class="dash-card-num" id="dashWarm">0</div>
+            <div class="dash-card-label" data-i18n="dashboard.warmLeads">Warm Leads</div>
+          </div>
+          <div class="dash-card cold-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line><line x1="4.93" y1="19.07" x2="19.07" y2="4.93"></line></svg></div><div class="dash-card-num" id="dashCold">0</div>
+            <div class="dash-card-label" data-i18n="dashboard.coldLeads">Cold Leads</div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div><div class="dash-card-num" id="dashToday">0</div>
+            <div class="dash-card-label" data-i18n="dashboard.todayLeads">Generated Today</div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div><div class="dash-card-num" id="dashSearches">0</div>
+            <div class="dash-card-label" data-i18n="dashboard.recentSearches">Recent Searches</div>
+          </div>
+        </div>
+
+        <div class="dash-card" style="padding:20px;">
+          <div class="dash-card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div><div class="dash-card-label" style="font-size:0.9rem;font-weight:600;color:var(--text);margin:8px 0 4px;" data-i18n="dashboard.startSearch">Start by generating your first leads</div>
+          <div style="font-size:0.78rem;color:var(--muted);">Use the search panel on the left to generate AI-powered leads from LinkedIn, Google, job postings, and more.</div>
+          <button class="generate-btn" style="max-width:220px;margin-top:14px;" onclick="showSection('leads-section')">
+            <span>Generate Leads →</span>
+          </button>
+        </div>
+      </div> <!-- End dashboard-section -->
+
+      <!-- ── COMPANIES SECTION ── -->
+      <div class="page-section" id="companies-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title" data-i18n="companies.title">Companies</div>
+            <div class="section-sub" data-i18n="companies.subtitle">Companies discovered from your lead searches</div>
+          </div>
+        </div>
+        <div id="companiesGrid" class="placeholder-grid">
+          <div class="coming-soon">
+            <div class="coming-soon-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="16"></line><line x1="15" y1="22" x2="15" y2="16"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg></div>
+            <h3 data-i18n="companies.empty">No companies yet. Generate leads to find companies.</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ANALYTICS SECTION ── -->
+      <div class="page-section" id="analytics-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title" data-i18n="analytics.title">Analytics</div>
+            <div class="section-sub" data-i18n="analytics.subtitle">Your lead generation performance</div>
+          </div>
+          <button class="csv-btn" onclick="exportAnalyticsCSV()" style="white-space:nowrap;">Export Report</button>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="dash-grid">
+          <div class="dash-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+            <div class="dash-card-num" id="an-total">—</div>
+            <div class="dash-card-label" data-i18n="dashboard.totalLeads">Total Leads</div>
+          </div>
+          <div class="dash-card hot-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg></div>
+            <div class="dash-card-num" id="an-rate">—</div>
+            <div class="dash-card-label">Hot Rate</div>
+          </div>
+          <div class="dash-card warm-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></div>
+            <div class="dash-card-num" id="an-hot">—</div>
+            <div class="dash-card-label">Hot Leads</div>
+          </div>
+          <div class="dash-card cold-card">
+            <div class="dash-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="19.07" y2="4.93"/></svg></div>
+            <div class="dash-card-num" id="an-searches">—</div>
+            <div class="dash-card-label" data-i18n="dashboard.recentSearches">Total Searches</div>
+          </div>
+        </div>
+
+        <!-- Charts row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+          <!-- Tier Distribution -->
+          <div class="dash-card" style="padding:20px;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:16px;">Lead Tier Distribution</div>
+            <div id="an-tier-chart" style="display:flex;flex-direction:column;gap:10px;"></div>
+          </div>
+
+          <!-- Source Breakdown -->
+          <div class="dash-card" style="padding:20px;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:16px;">Performance Score Breakdown</div>
+            <div id="an-score-chart" style="display:flex;flex-direction:column;gap:10px;"></div>
+          </div>
+        </div>
+
+        <!-- Recent Sessions -->
+        <div class="dash-card" style="padding:20px;">
+          <div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:16px;">Session History</div>
+          <div id="an-sessions" style="display:flex;flex-direction:column;gap:0;"></div>
+        </div>
+      </div>
+
+      <!-- ── CAMPAIGNS SECTION ── -->
+      <div class="page-section" id="campaigns-section">
+        <div class="section-header" style="margin-bottom:16px;">
+          <div>
+            <div class="section-title">Campaigns</div>
+            <div class="section-sub">Manage email campaigns and view generated emails</div>
+          </div>
+          <button class="generate-btn" onclick="openCreateCampaignModal()" style="white-space:nowrap;">Create Campaign</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:flex-start;">
+          <!-- Left: Campaign List -->
+          <div class="dash-card" style="padding:16px;min-height:400px;">
+            <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">Your Campaigns</div>
+            <div id="campaigns-list" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;">
+              <div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:16px;">Loading campaigns...</div>
+            </div>
+          </div>
+
+          <!-- Right: Campaign Details -->
+          <div class="dash-card" style="padding:20px;min-height:400px;" id="campaign-details-area">
+            <div style="color:var(--muted);font-size:0.85rem;text-align:center;padding:40px;">Select a campaign to view leads and emails.</div>
+          </div>
+        </div>
+      </div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-wrap">
+      <span>© 2026 LeadRadar · <span data-i18n="footer.powered">Powered by</span> <strong>prompticflow</strong></span>
+      <div class="footer-links">
+        <a href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a>
+        <a href="terms.html" data-i18n="footer.terms">Terms &amp; Conditions</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL -->
+  <div class="modal-bg hidden" id="modalBackdrop">
+    <div class="modal" id="leadModal">
+      <button class="modal-close" id="modalClose">✕</button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast hidden" id="toast"></div>
+
+  <!-- SETTINGS OVERLAY + DRAWER -->
+  <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsDrawer()"></div>
+  <div class="settings-drawer" id="settingsDrawer">
+    <div class="drawer-header">
+      <span class="drawer-title" data-i18n="settings.title">️ Settings</span>
+      <button class="drawer-close" onclick="closeSettingsDrawer()">✕</button>
+    </div>
+    <div class="drawer-body">
+
+      <!-- A. Theme -->
+      <div class="s-section">
+        <div class="s-section-title" data-i18n="settings.theme">Theme</div>
+        <div class="theme-grid" id="themeGrid">
+          <!-- Injected by JS -->
+        </div>
+        <div class="color-row" style="margin-top:8px;">
+          <div class="color-pick">
+            <label data-i18n="settings.primaryColor">Primary</label>
+            <input type="color" id="cp-primary" value="#4F7CFF" oninput="applyCustomColor('primary', this.value)" />
+          </div>
+          <div class="color-pick">
+            <label data-i18n="settings.secondaryColor">Secondary</label>
+            <input type="color" id="cp-secondary" value="#7C5CFF" oninput="applyCustomColor('secondary', this.value)" />
+          </div>
+          <div class="color-pick">
+            <label data-i18n="settings.glowColor">Glow</label>
+            <input type="color" id="cp-glow" value="#4F7CFF" oninput="applyCustomGlow(this.value)" />
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;" data-i18n="settings.glowIntensity">Glow Intensity</label>
+          <input type="range" class="glow-slider" id="glowSlider" min="0.5" max="2" step="0.1" value="1" oninput="applyGlowIntensitySlider(this.value)" />
+        </div>
+      </div>
+
+      <!-- B. Font -->
+      <div class="s-section">
+        <div class="s-section-title" data-i18n="settings.font">Font Family</div>
+        <select class="font-select" id="fontSelect" onchange="applyFontSetting(this.value)">
+          <option value="Inter">Inter (Default)</option>
+          <option value="Poppins">Poppins</option>
+          <option value="Roboto">Roboto</option>
+          <option value="Montserrat">Montserrat</option>
+          <option value="Noto Sans">Noto Sans (Global)</option>
+          <option value="Noto Sans Bengali">Noto Sans Bengali (বাংলা)</option>
+          <option value="Noto Sans Devanagari">Noto Sans Devanagari (हिंदी)</option>
+          <option value="Noto Sans Arabic">Noto Sans Arabic (عربي)</option>
+          <option value="Noto Sans JP">Noto Sans JP (日本語)</option>
+          <option value="Noto Sans KR">Noto Sans KR (한국어)</option>
+        </select>
+        <div class="font-preview" id="fontPreview">The quick brown fox jumps over the lazy dog. 0123456789</div>
+      </div>
+
+      <!-- C. Language -->
+      <div class="s-section">
+        <div class="s-section-title" data-i18n="settings.language">Language</div>
+        <select class="font-select" id="langSelect" onchange="applyLanguageSetting(this.value)">
+          <option value="en"> English</option>
+          <option value="hi"> Hindi — हिंदी</option>
+          <option value="bn"> Bengali — বাংলা</option>
+          <option value="es"> Spanish — Español</option>
+          <option value="fr"> French — Français</option>
+          <option value="de"> German — Deutsch</option>
+          <option value="ar"> Arabic — العربية</option>
+          <option value="pt"> Portuguese — Português</option>
+          <option value="it"> Italian — Italiano</option>
+          <option value="nl"> Dutch — Nederlands</option>
+          <option value="zh"> Chinese — 中文</option>
+          <option value="ja"> Japanese — 日本語</option>
+          <option value="ko"> Korean — 한국어</option>
+          <option value="ru"> Russian — Русский</option>
+          <option value="tr"> Turkish — Türkçe</option>
+          <option value="th"> Thai — ภาษาไทย</option>
+          <option value="vi"> Vietnamese — Tiếng Việt</option>
+          <option value="id"> Indonesian — Bahasa Indonesia</option>
+          <option value="ms"> Malay — Bahasa Melayu</option>
+        </select>
+      </div>
+
+      <!-- D. Country -->
+      <div class="s-section">
+        <div class="s-section-title" data-i18n="settings.country">Country &amp; Region</div>
+        <select class="font-select" id="countrySelect" onchange="applyCountrySetting(this.value)">
+          <option value="us"> United States</option>
+          <option value="gb"> United Kingdom</option>
+          <option value="ca"> Canada</option>
+          <option value="au"> Australia</option>
+          <option value="in"> India</option>
+          <option value="de"> Germany</option>
+          <option value="fr"> France</option>
+          <option value="ae"> UAE</option>
+          <option value="sg"> Singapore</option>
+          <option value="br"> Brazil</option>
+          <option value="jp"> Japan</option>
+          <option value="kr"> South Korea</option>
+          <option value="cn"> China</option>
+          <option value="ru"> Russia</option>
+          <option value="es"> Spain</option>
+          <option value="it"> Italy</option>
+          <option value="nl"> Netherlands</option>
+          <option value="sa"> Saudi Arabia</option>
+          <option value="id"> Indonesia</option>
+          <option value="my"> Malaysia</option>
+          <option value="th"> Thailand</option>
+          <option value="vn"> Vietnam</option>
+          <option value="tr"> Turkey</option>
+          <option value="mx"> Mexico</option>
+          <option value="bd"> Bangladesh</option>
+          <option value="pk"> Pakistan</option>
+          <option value="eg"> Egypt</option>
+          <option value="ng"> Nigeria</option>
+          <option value="za"> South Africa</option>
+          <option value="nz"> New Zealand</option>
+        </select>
+      </div>
+
+      <!-- F. Profile -->
+      <div class="s-section">
+        <div class="s-section-title" data-i18n="settings.profile">Profile Settings</div>
+        <div class="profile-form">
+          <div class="profile-field">
+            <label class="profile-label" data-i18n="profile.fullName">Full Name</label>
+            <input class="profile-input" type="text" id="pf-name" placeholder="Your full name" />
+          </div>
+          <div class="profile-field">
+            <label class="profile-label" data-i18n="profile.email">Email Address</label>
+            <input class="profile-input" type="email" id="pf-email" placeholder="you@company.com" />
+          </div>
+          <div class="profile-field">
+            <label class="profile-label" data-i18n="profile.phone">Phone Number</label>
+            <input class="profile-input" type="tel" id="pf-phone" placeholder="+1 234 567 8900" />
+          </div>
+          <div class="profile-field">
+            <label class="profile-label" data-i18n="profile.website">Company Website</label>
+            <input class="profile-input" type="url" id="pf-website" placeholder="https://company.com" />
+          </div>
+          <button class="save-btn" onclick="saveProfile()" id="saveProfileBtn" data-i18n="settings.save">Save Changes</button>
+        </div>
+      </div>
+
+      <!-- Apify Settings -->
+      <div class="s-section">
+        <div class="s-section-title">Apify Settings</div>
+        <div class="profile-form">
+          <div class="profile-field">
+            <label class="profile-label">Apify API Token</label>
+            <input class="profile-input" type="password" id="pf-apifyToken" placeholder="apify_api_..." />
+          </div>
+          <div class="profile-field">
+            <label class="profile-label">Apify Actor ID (Optional)</label>
+            <input class="profile-input" type="text" id="pf-apifyActorId" placeholder="apify~google-search-scraper" />
+          </div>
+          <button class="save-btn btn-outline" style="background:transparent;border:1px solid var(--border);" onclick="testApify()" id="testApifyBtn">Test Connection</button>
+        </div>
+      </div>
+
+      <!-- n8n Automation Settings -->
+      <div class="s-section">
+        <div class="s-section-title">n8n Automation</div>
+        <div class="profile-form">
+          <div class="profile-field" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <input type="checkbox" id="pf-n8nEnabled" style="width:16px;height:16px;" />
+            <label class="profile-label" style="margin:0;">Enable n8n Webhooks</label>
+          </div>
+          <div class="profile-field">
+            <label class="profile-label">Webhook URL</label>
+            <input class="profile-input" type="url" id="pf-n8nWebhookUrl" placeholder="https://your-n8n.com/webhook/..." />
+          </div>
+          <div class="profile-field">
+            <label class="profile-label">Webhook Secret (Optional)</label>
+            <input class="profile-input" type="password" id="pf-n8nWebhookSecret" placeholder="Secret..." />
+          </div>
+          <button class="save-btn btn-outline" style="background:transparent;border:1px solid var(--border);" onclick="testN8n()" id="testN8nBtn">Test Webhook</button>
+        </div>
+      </div>
+
+      <!-- AI & SMTP Settings -->
+      <div class="s-section">
+        <div class="s-section-title">AI & SMTP Settings</div>
+        <div class="profile-form">
+          <div class="profile-field">
+            <label class="profile-label">OpenRouter API Key</label>
+            <input class="profile-input" type="password" id="pf-openRouterKey" placeholder="sk-or-v1-..." />
+          </div>
+          <hr style="border:0;border-top:1px solid var(--border);margin:15px 0;" />
+          <div class="profile-field">
+            <label class="profile-label">SMTP Host</label>
+            <input class="profile-input" type="text" id="pf-smtpHost" placeholder="smtp.gmail.com" />
+          </div>
+          <div class="profile-field">
+            <label class="profile-label">SMTP Username/Email</label>
+            <input class="profile-input" type="text" id="pf-smtpUser" placeholder="you@domain.com" />
+          </div>
+          <div class="profile-field">
+            <label class="profile-label">SMTP App Password</label>
+            <input class="profile-input" type="password" id="pf-smtpPass" placeholder="Password..." />
+          </div>
+          <button class="save-btn btn-outline" style="background:transparent;border:1px solid var(--border);" onclick="testSmtp()" id="testSmtpBtn">Test SMTP</button>
+        </div>
+      </div>
+    </div>
+  <!-- Add to Campaign Modal -->
+  <div class="modal" id="addToCampaignModal">
+    <div class="modal-content" style="max-width:500px;">
+      <div class="modal-header">
+        <h3>Add Leads to Campaign</h3>
+        <button class="modal-close" onclick="document.getElementById('addToCampaignModal').classList.add('hidden')">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:15px;">Select an existing campaign to add <span id="addCampaignCount">0</span> leads to.</p>
+        <div class="field">
+          <label>Select Campaign</label>
+          <select id="addToCampaignSelect">
+            <option value="">Loading campaigns...</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="document.getElementById('addToCampaignModal').classList.add('hidden')">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmAddToCampaign()">Add Leads</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Campaign Modal -->
+  <div class="modal" id="createCampaignModal">
+    <div class="modal-content" style="max-width:500px;">
+      <div class="modal-header">
+        <h3>Create New Campaign</h3>
+        <button class="modal-close" onclick="document.getElementById('createCampaignModal').classList.add('hidden')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Campaign Name</label>
+          <input type="text" id="newCampaignName" placeholder="e.g. Q4 SaaS Founders Outreach" />
+        </div>
+        <div class="field">
+          <label>Campaign Goal</label>
+          <input type="text" id="newCampaignGoal" placeholder="e.g. Book a discovery call" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="document.getElementById('createCampaignModal').classList.add('hidden')">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmCreateCampaign()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email Preview Modal -->
+  <div class="modal" id="emailPreviewModal">
+    <div class="modal-content" style="max-width:600px;">
+      <div class="modal-header">
+        <h3>Generated Email</h3>
+        <button class="modal-close" onclick="document.getElementById('emailPreviewModal').classList.add('hidden')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Subject</label>
+          <input type="text" id="previewSubject" />
+        </div>
+        <div class="field">
+          <label>Body</label>
+          <textarea id="previewBody" rows="8" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="document.getElementById('emailPreviewModal').classList.add('hidden')">Close</button>
+        <button class="btn btn-primary" id="saveEmailBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="prefs.js"></script>
+  <script src="theme.js"></script>
+  <script src="i18n.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script src="campaigns.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+﻿{
+  "nav": { "dashboard": "Panel", "leads": "Clientes", "companies": "Empresas", "analytics": "Análisis", "messages": "Mensajes", "settings": "Configuración" },
+  "header": { "welcome": "Bienvenido a LeadRadar", "welcomeBack": "Bienvenido de nuevo", "welcomeNew": "Bienvenido a LeadRadar", "subtitle": "Encontremos tus mejores clientes hoy." },
+  "sidebar": { "title": "Parámetros de búsqueda", "leadGoal": "Objetivo de cliente", "keyword": "Título / Palabra clave", "location": "Ubicación", "country": "País", "maxResults": "Máx. resultados", "tierFilter": "Filtro de nivel", "generateLeads": "Generar clientes", "scanning": "Escaneando…" },
+  "tiers": { "all": "Todos", "hot": "Caliente", "warm": "Tibio", "cold": "Frío" },
+  "stats": { "total": "Total", "hot": "Caliente", "warm": "Tibio", "cold": "Frío", "phones": "Teléfonos", "websites": "Sitios web" },
+  "toolbar": { "search": "Buscar…", "export": "Exportar CSV" },
+  "empty": { "title": "Aún no hay clientes", "subtitle": "Completa los parámetros y haz clic en Generar clientes." },
+  "loading": { "title": "Escaneando…", "subtitle": "Esto puede tardar 30–90 segundos." },
+  "error": { "title": "Algo salió mal", "retry": "Intentar de nuevo" },
+  "settings": { "title": "Configuración", "theme": "Tema", "themePreset": "Temas predefinidos", "font": "Fuente", "language": "Idioma", "country": "País y región", "sidebar": "Posición del panel", "sidebarLeft": "Izquierda", "sidebarRight": "Derecha", "profile": "Perfil", "save": "Guardar cambios", "saved": "✓ Guardado!" },
+  "profile": { "fullName": "Nombre completo", "email": "Correo electrónico", "phone": "Número de teléfono", "website": "Sitio web de la empresa", "country": "País", "language": "Idioma preferido" },
+  "login": { "title": "Bienvenido de nuevo", "subtitle": "Inicia sesión en tu cuenta de LeadRadar", "email": "Correo electrónico", "password": "Contraseña", "signin": "Iniciar sesión", "noAccount": "¿No tienes cuenta?", "signupLink": "Regístrate", "signupTitle": "Crear cuenta", "signupSubtitle": "Únete a LeadRadar", "fullName": "Nombre completo", "phone": "Número de teléfono", "website": "Sitio web", "confirmPassword": "Confirmar contraseña", "haveAccount": "¿Ya tienes cuenta?", "signinLink": "Iniciar sesión", "passwordMismatch": "Las contraseñas no coinciden", "passwordTooShort": "La contraseña debe tener al menos 8 caracteres", "fillAll": "Por favor completa todos los campos" },
+  "footer": { "powered": "Desarrollado por", "privacy": "Política de privacidad", "terms": "Términos y condiciones" },
+  "signout": "Cerrar sesión",
+  "dropdown": { "profile": "Perfil", "settings": "Configuración", "billing": "Facturación", "logout": "Cerrar sesión" },
+  "dashboard": { "totalLeads": "Total de clientes", "hotLeads": "Clientes calientes", "warmLeads": "Clientes tibios", "coldLeads": "Clientes fríos", "todayLeads": "Generados hoy", "recentSearches": "Búsquedas recientes", "noSearches": "Aún no hay búsquedas recientes.", "startSearch": "Comienza generando tus primeros clientes" }
+}

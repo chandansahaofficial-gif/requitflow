@@ -1,0 +1,98 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
+import { sendEmail } from '@/lib/smtp';
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const sequence = await prisma.emailSequence.findUnique({
+      where: { id: params.id },
+      include: { lead: true }
+    });
+
+    if (!sequence || sequence.userId !== user.id) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    if (sequence.approvalStatus !== 'Approved') {
+      return NextResponse.json({ error: 'Only approved emails can be sent' }, { status: 400 });
+    }
+    
+    if (sequence.status === 'Sent') {
+      return NextResponse.json({ error: 'Email has already been sent' }, { status: 400 });
+    }
+
+    if (!sequence.lead.email) {
+      return NextResponse.json({ error: 'Lead does not have an email address' }, { status: 400 });
+    }
+
+    // Check unsubscribe list
+    const isUnsub = await prisma.unsubscribeList.findUnique({
+      where: { userId_email: { userId: user.id, email: sequence.lead.email } }
+    });
+    if (isUnsub) {
+      return NextResponse.json({ error: 'Cannot send to unsubscribed lead' }, { status: 400 });
+    }
+
+    const finalSubject = sequence.editedSubject || sequence.aiOriginalSubject || sequence.subject;
+    const finalBody = sequence.editedBody || sequence.aiOriginalBody || sequence.body;
+
+    try {
+      await sendEmail({
+        userId: user.id,
+        to: sequence.lead.email,
+        subject: finalSubject,
+        html: finalBody.replace(/\n/g, '<br/>')
+      });
+
+      const updatedSeq = await prisma.emailSequence.update({
+        where: { id: sequence.id },
+        data: {
+          status: 'Sent',
+          sentAt: new Date()
+        }
+      });
+
+      await prisma.emailSendLog.create({
+        data: {
+          campaignId: sequence.campaignId,
+          leadId: sequence.leadId,
+          emailSequenceId: sequence.id,
+          subject: finalSubject,
+          body: finalBody,
+          status: 'Sent',
+          sentAt: new Date()
+        }
+      });
+
+      return NextResponse.json({ success: true, email: updatedSeq });
+    } catch (sendError: any) {
+      console.error("SMTP Send Failed:", sendError);
+      
+      await prisma.emailSequence.update({
+        where: { id: sequence.id },
+        data: { status: 'Failed', errorMessage: sendError.message }
+      });
+
+      await prisma.emailSendLog.create({
+        data: {
+          campaignId: sequence.campaignId,
+          leadId: sequence.leadId,
+          emailSequenceId: sequence.id,
+          subject: finalSubject,
+          body: finalBody,
+          status: 'Failed',
+          errorMessage: sendError.message
+        }
+      });
+
+      return NextResponse.json({ error: 'Sending failed: ' + sendError.message }, { status: 500 });
+    }
+  } catch (error: any) {
+    console.error("Send now error:", error);
+    return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 });
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "nav": { "dashboard": "ড্যাশবোর্ড", "leads": "লিডস", "companies": "কোম্পানি", "analytics": "বিশ্লেষণ", "messages": "বার্তা", "settings": "সেটিংস" },
+  "header": { "welcome": "LeadRadar-এ স্বাগতম", "welcomeBack": "আবার স্বাগতম", "welcomeNew": "LeadRadar-এ স্বাগতম", "subtitle": "আজ আপনার সেরা লিডগুলো খুঁজে বের করি।" },
+  "sidebar": { "title": "অনুসন্ধান প্যারামিটার", "leadGoal": "লিড লক্ষ্য", "keyword": "চাকরির শিরোনাম / কীওয়ার্ড", "location": "অবস্থান", "country": "দেশ", "maxResults": "সর্বোচ্চ ফলাফল", "tierFilter": "লিড টিয়ার ফিল্টার", "generateLeads": "লিড তৈরি করুন", "scanning": "স্ক্যান হচ্ছে…" },
+  "tiers": { "all": "সব", "hot": "হট", "warm": "ওয়ার্ম", "cold": "কোল্ড" },
+  "stats": { "total": "মোট", "hot": "হট", "warm": "ওয়ার্ম", "cold": "কোল্ড", "phones": "ফোন", "websites": "ওয়েবসাইট", "companies": "কোম্পানি", "links": "লিঙ্ক" },
+  "toolbar": { "search": "অনুসন্ধান করুন…", "export": "CSV রপ্তানি করুন" },
+  "empty": { "title": "এখনও কোনো লিড নেই", "subtitle": "অনুসন্ধান প্যারামিটার পূরণ করুন এবং লিড তৈরি করুন ক্লিক করুন।" },
+  "loading": { "title": "স্ক্যান হচ্ছে…", "subtitle": "এটি 30–90 সেকেন্ড সময় নিতে পারে।" },
+  "error": { "title": "কিছু ভুল হয়েছে", "retry": "আবার চেষ্টা করুন" },
+  "settings": { "title": "সেটিংস", "theme": "থিম", "themePreset": "প্রিসেট থিম", "customColors": "কাস্টম রঙ", "primaryColor": "প্রাথমিক রঙ", "secondaryColor": "মাধ্যমিক রঙ", "glowColor": "গ্লো রঙ", "glowIntensity": "গ্লো তীব্রতা", "font": "ফন্ট পরিবার", "language": "ভাষা", "country": "দেশ ও অঞ্চল", "defaultCountry": "ডিফল্ট দেশ", "sidebar": "সাইডবার অবস্থান", "sidebarLeft": "বাম", "sidebarRight": "ডান", "profile": "প্রোফাইল সেটিংস", "save": "পরিবর্তন সংরক্ষণ করুন", "saved": "✓ সংরক্ষিত!" },
+  "profile": { "fullName": "পুরো নাম", "email": "ইমেইল ঠিকানা", "phone": "ফোন নম্বর", "website": "কোম্পানি ওয়েবসাইট", "country": "দেশ", "language": "পছন্দের ভাষা" },
+  "login": { "title": "আবার স্বাগতম", "subtitle": "আপনার LeadRadar অ্যাকাউন্টে সাইন ইন করুন", "email": "ইমেইল ঠিকানা", "password": "পাসওয়ার্ড", "signin": "সাইন ইন করুন", "noAccount": "অ্যাকাউন্ট নেই?", "signupLink": "সাইন আপ করুন", "signupTitle": "অ্যাকাউন্ট তৈরি করুন", "signupSubtitle": "LeadRadar-এ যোগ দিন এবং লিড তৈরি শুরু করুন", "fullName": "পুরো নাম", "phone": "ফোন নম্বর", "website": "কোম্পানি ওয়েবসাইট", "confirmPassword": "পাসওয়ার্ড নিশ্চিত করুন", "haveAccount": "ইতিমধ্যে অ্যাকাউন্ট আছে?", "signinLink": "সাইন ইন করুন", "passwordMismatch": "পাসওয়ার্ড মেলে না", "passwordTooShort": "পাসওয়ার্ড কমপক্ষে 8 অক্ষর হতে হবে", "invalidEmail": "একটি বৈধ ইমেইল ঠিকানা লিখুন", "invalidPhone": "একটি বৈধ ফোন নম্বর লিখুন", "invalidWebsite": "একটি বৈধ ওয়েবসাইট URL লিখুন", "fillAll": "অনুগ্রহ করে সমস্ত প্রয়োজনীয় ক্ষেত্র পূরণ করুন" },
+  "footer": { "powered": "দ্বারা চালিত", "privacy": "গোপনীয়তা নীতি", "terms": "শর্তাবলী" },
+  "signout": "সাইন আউট",
+  "dropdown": { "profile": "প্রোফাইল", "settings": "সেটিংস", "billing": "বিলিং", "logout": "সাইন আউট" },
+  "dashboard": { "totalLeads": "মোট লিড", "hotLeads": "হট লিড", "warmLeads": "ওয়ার্ম লিড", "coldLeads": "কোল্ড লিড", "todayLeads": "আজ তৈরি করা হয়েছে", "recentSearches": "সাম্প্রতিক অনুসন্ধান", "noSearches": "এখনও কোনো সাম্প্রতিক অনুসন্ধান নেই।", "startSearch": "আপনার প্রথম লিড তৈরি করে শুরু করুন" },
+  "companies": { "title": "কোম্পানি", "subtitle": "আপনার লিড অনুসন্ধান থেকে আবিষ্কৃত কোম্পানি", "empty": "এখনও কোনো কোম্পানি নেই। লিড তৈরি করুন।" },
+  "analytics": { "title": "বিশ্লেষণ", "subtitle": "আপনার লিড তৈরির পারফরম্যান্স" },
+  "messages": { "title": "বার্তা", "subtitle": "আপনার আউটরিচ ইনবক্স", "empty": "এখনও কোনো বার্তা নেই।" }
+}

@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background: radial-gradient(circle at top right, rgba(124, 58, 237, 0.20), transparent 35%),
+                radial-gradient(circle at bottom left, rgba(37, 99, 235, 0.12), transparent 30%),
+                linear-gradient(180deg, #08070D 0%, #050505 100%);
+    background-attachment: fixed;
+    color: #FFFFFF;
+  }
+
+  input, textarea, select {
+    background-color: #0F0D1A !important;
+    border-color: #2A2540 !important;
+    color: #FFFFFF !important;
+    border-radius: 12px;
+  }
+  
+  input:focus, textarea:focus, select:focus {
+    border-color: #A855F7 !important;
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25) !important;
+    outline: none !important;
+  }
+  
+  input::placeholder, textarea::placeholder {
+    color: #7C748E !important;
+  }
+
+  table {
+    background: rgba(21, 19, 38, 0.85);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  tr {
+    border-bottom: 1px solid rgba(168, 85, 247, 0.15) !important;
+  }
+
+  tr:hover {
+    background: rgba(124, 58, 237, 0.05) !important;
+  }
+
+  td {
+    color: #A8A3B8;
+    padding: 16px;
+  }
+
+  th {
+    color: #FFFFFF;
+    background: rgba(21, 19, 38, 0.95);
+    padding: 16px;
+    text-align: left;
+  }
+}
+
+@layer components {
+  .glass {
+    background: rgba(21, 19, 38, 0.85) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(168, 85, 247, 0.18) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+    border-radius: 20px !important;
+  }
+
+  button.bg-blue-600, button.hover\:bg-blue-600.hover-button {
+    background: linear-gradient(135deg, #7C3AED, #2563EB) !important;
+    box-shadow: 0 0 25px rgba(124, 58, 237, 0.35) !important;
+    color: #FFFFFF !important;
+    transform: translateY(-2px) !important;
+    border: none !important;
+    transition: all 0.3s ease !important;
+  }
+  .hover\:bg-blue-600.hover-button:hover {
+    background: linear-gradient(135deg, #A855F7, #38BDF8) !important;
+    box-shadow: 0 0 35px rgba(124, 58, 237, 0.5) !important;
+  }
+  
+  .sidebar-active {
+    background: rgba(124, 58, 237, 0.16) !important;
+    color: #C084FC !important;
+    border-left: 3px solid #A855F7 !important;
+    box-shadow: inset 0 0 20px rgba(124, 58, 237, 0.15) !important;
+    border-radius: 0 12px 12px 0 !important;
+  }
+}

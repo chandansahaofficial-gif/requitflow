@@ -1,0 +1,17 @@
+﻿{
+  "nav": { "dashboard": "Tableau de bord", "leads": "Prospects", "companies": "Entreprises", "analytics": "Analytique", "messages": "Messages", "settings": "Paramètres" },
+  "header": { "welcome": "Bienvenue sur LeadRadar", "welcomeBack": "Bon retour", "welcomeNew": "Bienvenue sur LeadRadar", "subtitle": "Trouvons vos meilleurs prospects aujourd'hui." },
+  "sidebar": { "title": "Paramètres de recherche", "leadGoal": "Objectif de prospect", "keyword": "Titre / Mot-clé", "location": "Lieu", "country": "Pays", "maxResults": "Résultats max.", "tierFilter": "Filtre par niveau", "generateLeads": "Générer des prospects", "scanning": "Scan en cours…" },
+  "tiers": { "all": "Tous", "hot": "Chaud", "warm": "Tiède", "cold": "Froid" },
+  "toolbar": { "search": "Rechercher…", "export": "Exporter CSV" },
+  "empty": { "title": "Pas encore de prospects", "subtitle": "Remplissez les paramètres et cliquez sur Générer." },
+  "loading": { "title": "Scan en cours…", "subtitle": "Cela peut prendre 30 à 90 secondes." },
+  "error": { "title": "Une erreur est survenue", "retry": "Réessayer" },
+  "settings": { "title": "Paramètres", "theme": "Thème", "font": "Police", "language": "Langue", "country": "Pays et région", "sidebar": "Position de la barre", "sidebarLeft": "Gauche", "sidebarRight": "Droite", "profile": "Profil", "save": "Enregistrer", "saved": "✓ Enregistré!" },
+  "profile": { "fullName": "Nom complet", "email": "Adresse e-mail", "phone": "Numéro de téléphone", "website": "Site web", "country": "Pays", "language": "Langue préférée" },
+  "login": { "title": "Bon retour", "subtitle": "Connectez-vous à votre compte LeadRadar", "email": "Adresse e-mail", "password": "Mot de passe", "signin": "Se connecter", "noAccount": "Pas de compte ?", "signupLink": "S'inscrire", "signupTitle": "Créer un compte", "fullName": "Nom complet", "confirmPassword": "Confirmer le mot de passe", "haveAccount": "Déjà un compte ?", "signinLink": "Se connecter", "passwordMismatch": "Les mots de passe ne correspondent pas", "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères", "fillAll": "Veuillez remplir tous les champs" },
+  "footer": { "powered": "Propulsé par", "privacy": "Politique de confidentialité", "terms": "Conditions d'utilisation" },
+  "signout": "Se déconnecter",
+  "dropdown": { "profile": "Profil", "settings": "Paramètres", "billing": "Facturation", "logout": "Se déconnecter" },
+  "dashboard": { "totalLeads": "Total des prospects", "hotLeads": "Prospects chauds", "warmLeads": "Prospects tièdes", "coldLeads": "Prospects froids", "todayLeads": "Générés aujourd'hui", "recentSearches": "Recherches récentes", "noSearches": "Aucune recherche récente.", "startSearch": "Commencez par générer vos premiers prospects" }
+}

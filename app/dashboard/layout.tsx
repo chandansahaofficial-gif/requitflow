@@ -1,0 +1,120 @@
+"use client";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { 
+  LayoutDashboard, Users, UserPlus, Send, MessageSquare, 
+  PhoneCall, BarChart3, Settings, LogOut, Search, Bell,
+  BookOpen, KanbanSquare, Calendar, CreditCard
+} from "lucide-react";
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed', error);
+    }
+  };
+
+  const navItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Find Client Leads", href: "/dashboard/generate-leads", icon: UserPlus },
+    { name: "Job & Hiring Search", href: "/dashboard/job-search", icon: Search },
+    { name: "Companies Hiring", href: "/dashboard/companies-hiring", icon: Search },
+    { name: "Search Candidates", href: "/dashboard/search-candidates", icon: Search },
+    { name: "Client Lead Database", href: "/dashboard/leads", icon: Users },
+    { name: "Candidate Database", href: "/dashboard/candidates", icon: Users },
+    { name: "Saved Jobs", href: "/dashboard/saved-jobs", icon: BookOpen },
+    { name: "Applied Jobs", href: "/dashboard/applied-jobs", icon: KanbanSquare },
+    { name: "Resume Match", href: "/dashboard/resume-match", icon: Users },
+    { name: "Recruitment Campaigns", href: "/dashboard/campaigns", icon: Send },
+    { name: "AI Email Agent", href: "/dashboard/ai-email-agent", icon: MessageSquare },
+    { name: "SMS Outreach", href: "/dashboard/sms-outreach", icon: MessageSquare },
+    { name: "Replies Inbox", href: "/dashboard/replies", icon: MessageSquare },
+    { name: "Booked Calls", href: "/dashboard/booked-calls", icon: PhoneCall },
+    { name: "Knowledge Base", href: "/dashboard/knowledge-base", icon: BookOpen },
+    { name: "Recruitment Pipeline", href: "/dashboard/pipeline", icon: KanbanSquare },
+    { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+    { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
+    { name: "Settings", href: "/dashboard/settings", icon: Settings },
+    { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
+    { name: "Admin", href: "/dashboard/admin", icon: Users },
+  ];
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden text-foreground">
+      {/* Sidebar */}
+      <aside className="w-64 glass border-r border-slate-800 flex flex-col">
+        <div className="p-6">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+            RecruitFlow AI
+          </h1>
+        </div>
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link key={item.name} href={item.href}>
+                <span className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? 'sidebar-active' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                  <item.icon size={20} />
+                  <span className="font-medium">{item.name}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="p-4 mt-auto">
+          <button 
+            onClick={handleLogout}
+            className="flex w-full items-center space-x-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
+          >
+            <LogOut size={20} />
+            <span className="font-medium">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Header */}
+        <header className="h-20 glass border-b border-slate-800 flex items-center justify-between px-8 z-10">
+          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-full px-4 py-2 w-96">
+            <Search size={18} className="text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search leads, campaigns..." 
+              className="bg-transparent border-none outline-none ml-3 w-full text-sm text-white placeholder-slate-500"
+            />
+          </div>
+          <div className="flex items-center space-x-6">
+            <button className="relative text-slate-400 hover:text-white transition">
+              <Bell size={20} />
+              <span className="absolute top-0 right-0 w-2 h-2 bg-blue-500 rounded-full"></span>
+            </button>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 p-[2px]">
+                <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center font-bold text-sm">
+                  JD
+                </div>
+              </div>
+            </div>
+            <Link href="/dashboard/generate-leads">
+              <button className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-full font-medium transition-all shadow-lg shadow-blue-500/25">
+                Generate Leads
+              </button>
+            </Link>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto p-8 relative z-0">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

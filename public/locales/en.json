@@ -1,0 +1,22 @@
+{
+  "nav": { "dashboard": "Dashboard", "leads": "Leads", "companies": "Companies", "analytics": "Analytics", "messages": "Messages", "settings": "Settings" },
+  "header": { "welcome": "Welcome to LeadRadar", "welcomeBack": "Welcome back", "welcomeNew": "Welcome to LeadRadar", "subtitle": "Let's find your next best leads today." },
+  "sidebar": { "title": "Search Parameters", "leadGoal": "Lead Goal", "keyword": "Job Title / Keyword", "location": "Location", "country": "Country", "maxResults": "Max Results", "tierFilter": "Lead Tier Filter", "generateLeads": "Generate Leads", "scanning": "Scanning…" },
+  "source": { "linkedin": "Find Professionals (LinkedIn)", "google": "Find Local Businesses (Google Maps)", "jobs": "Find Hiring Companies (Job Postings)", "employees": "Find Candidates (Resumes/Profiles)" },
+  "tiers": { "all": "All", "hot": "Hot", "warm": "Warm", "cold": "Cold" },
+  "stats": { "total": "Total", "hot": "Hot", "warm": "Warm", "cold": "Cold", "phones": "Phones", "websites": "Websites", "companies": "Companies", "links": "Links" },
+  "toolbar": { "search": "Search…", "export": "Export CSV" },
+  "empty": { "title": "No leads yet", "subtitle": "Fill in the search parameters and click Generate Leads to begin." },
+  "loading": { "title": "Scanning…", "subtitle": "This may take 30–90 seconds." },
+  "error": { "title": "Something went wrong", "retry": "Try Again" },
+  "settings": { "title": "Settings", "theme": "Theme", "themePreset": "Preset Themes", "customColors": "Custom Colors", "primaryColor": "Primary Color", "secondaryColor": "Secondary Color", "glowColor": "Glow Color", "glowIntensity": "Glow Intensity", "font": "Font Family", "language": "Language", "country": "Country & Region", "defaultCountry": "Default Lead Country", "sidebar": "Sidebar Position", "sidebarLeft": "Left", "sidebarRight": "Right", "profile": "Profile Settings", "save": "Save Changes", "saved": "✓ Saved!" },
+  "profile": { "fullName": "Full Name", "email": "Email Address", "phone": "Phone Number", "website": "Company Website", "country": "Country", "language": "Preferred Language" },
+  "login": { "title": "Welcome Back", "subtitle": "Sign in to your LeadRadar account", "email": "Email Address", "password": "Password", "signin": "Sign In", "noAccount": "Don't have an account?", "signupLink": "Sign Up", "signupTitle": "Create Account", "signupSubtitle": "Join LeadRadar and start generating leads", "fullName": "Full Name", "phone": "Phone Number", "website": "Company Website", "confirmPassword": "Confirm Password", "haveAccount": "Already have an account?", "signinLink": "Sign In", "passwordMismatch": "Passwords do not match", "passwordTooShort": "Password must be at least 8 characters", "invalidEmail": "Please enter a valid email address", "invalidPhone": "Please enter a valid phone number", "invalidWebsite": "Please enter a valid website URL", "fillAll": "Please fill in all required fields" },
+  "footer": { "powered": "Powered by", "privacy": "Privacy Policy", "terms": "Terms & Conditions" },
+  "signout": "Sign Out",
+  "dropdown": { "profile": "Profile", "settings": "Settings", "billing": "Billing", "logout": "Sign Out" },
+  "dashboard": { "totalLeads": "Total Leads", "hotLeads": "Hot Leads", "warmLeads": "Warm Leads", "coldLeads": "Cold Leads", "todayLeads": "Generated Today", "recentSearches": "Recent Searches", "noSearches": "No recent searches yet.", "startSearch": "Start by generating your first leads" },
+  "companies": { "title": "Companies", "subtitle": "Companies discovered from your lead searches", "empty": "No companies yet. Generate leads to find companies." },
+  "analytics": { "title": "Analytics", "subtitle": "Your lead generation performance" },
+  "messages": { "title": "Messages", "subtitle": "Your outreach inbox", "empty": "No messages yet." }
+}

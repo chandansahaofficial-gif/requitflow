@@ -1,0 +1,17 @@
+﻿{
+  "nav": { "dashboard": "Dashboard", "leads": "Leads", "companies": "Unternehmen", "analytics": "Analysen", "messages": "Nachrichten", "settings": "Einstellungen" },
+  "header": { "welcome": "Willkommen bei LeadRadar", "welcomeBack": "Willkommen zurück", "welcomeNew": "Willkommen bei LeadRadar", "subtitle": "Finden wir heute Ihre besten Leads." },
+  "sidebar": { "title": "Suchparameter", "leadGoal": "Lead-Ziel", "keyword": "Jobtitel / Stichwort", "location": "Standort", "country": "Land", "maxResults": "Max. Ergebnisse", "tierFilter": "Lead-Stufen-Filter", "generateLeads": "Leads generieren", "scanning": "Wird gescannt…" },
+  "tiers": { "all": "Alle", "hot": "Heiß", "warm": "Warm", "cold": "Kalt" },
+  "toolbar": { "search": "Suchen…", "export": "CSV exportieren" },
+  "empty": { "title": "Noch keine Leads", "subtitle": "Füllen Sie die Parameter aus und klicken Sie auf Leads generieren." },
+  "loading": { "title": "Wird gescannt…", "subtitle": "Dies kann 30–90 Sekunden dauern." },
+  "error": { "title": "Etwas ist schiefgelaufen", "retry": "Nochmals versuchen" },
+  "settings": { "title": "Einstellungen", "theme": "Thema", "font": "Schriftart", "language": "Sprache", "country": "Land und Region", "sidebar": "Seitenleistenposition", "sidebarLeft": "Links", "sidebarRight": "Rechts", "profile": "Profil", "save": "Änderungen speichern", "saved": "✓ Gespeichert!" },
+  "profile": { "fullName": "Vollständiger Name", "email": "E-Mail-Adresse", "phone": "Telefonnummer", "website": "Firmenwebsite", "country": "Land", "language": "Bevorzugte Sprache" },
+  "login": { "title": "Willkommen zurück", "subtitle": "Melden Sie sich bei Ihrem LeadRadar-Konto an", "email": "E-Mail-Adresse", "password": "Passwort", "signin": "Anmelden", "noAccount": "Kein Konto?", "signupLink": "Registrieren", "signupTitle": "Konto erstellen", "fullName": "Vollständiger Name", "confirmPassword": "Passwort bestätigen", "haveAccount": "Bereits ein Konto?", "signinLink": "Anmelden", "passwordMismatch": "Passwörter stimmen nicht überein", "passwordTooShort": "Passwort muss mindestens 8 Zeichen haben", "fillAll": "Bitte füllen Sie alle Felder aus" },
+  "footer": { "powered": "Betrieben von", "privacy": "Datenschutzrichtlinie", "terms": "Nutzungsbedingungen" },
+  "signout": "Abmelden",
+  "dropdown": { "profile": "Profil", "settings": "Einstellungen", "billing": "Abrechnung", "logout": "Abmelden" },
+  "dashboard": { "totalLeads": "Gesamt Leads", "hotLeads": "Heiße Leads", "warmLeads": "Warme Leads", "coldLeads": "Kalte Leads", "todayLeads": "Heute generiert", "recentSearches": "Letzte Suchen", "noSearches": "Noch keine Suchen.", "startSearch": "Beginnen Sie mit der Generierung Ihrer ersten Leads" }
+}

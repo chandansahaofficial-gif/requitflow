@@ -1,0 +1,22 @@
+{
+  "nav": { "dashboard": "डैशबोर्ड", "leads": "लीड्स", "companies": "कंपनियाँ", "analytics": "विश्लेषण", "messages": "संदेश", "settings": "सेटिंग्स" },
+  "header": { "welcome": "LeadRadar में आपका स्वागत है", "welcomeBack": "वापसी पर स्वागत है", "welcomeNew": "LeadRadar में आपका स्वागत है", "subtitle": "आइए आज आपके सर्वश्रेष्ठ लीड्स खोजें।" },
+  "sidebar": { "title": "खोज पैरामीटर", "leadGoal": "लीड लक्ष्य", "keyword": "जॉब टाइटल / कीवर्ड", "location": "स्थान", "country": "देश", "maxResults": "अधिकतम परिणाम", "tierFilter": "लीड टियर फ़िल्टर", "generateLeads": "लीड्स जनरेट करें", "scanning": "स्कैन हो रहा है…" },
+  "source": { "linkedin": "पेशेवर खोजें (LinkedIn)", "google": "स्थानीय व्यवसाय खोजें (Google Maps)", "jobs": "नौकरी देने वाली कंपनियाँ खोजें", "employees": "उम्मीदवार खोजें (रिज्यूमे/प्रोफाइल)" },
+  "tiers": { "all": "सभी", "hot": "हॉट", "warm": "वार्म", "cold": "कोल्ड" },
+  "stats": { "total": "कुल", "hot": "हॉट", "warm": "वार्म", "cold": "कोल्ड", "phones": "फ़ोन", "websites": "वेबसाइट", "companies": "कंपनियाँ", "links": "लिंक" },
+  "toolbar": { "search": "खोजें…", "export": "CSV निर्यात करें" },
+  "empty": { "title": "अभी तक कोई लीड नहीं", "subtitle": "खोज पैरामीटर भरें और लीड्स जनरेट करें पर क्लिक करें।" },
+  "loading": { "title": "स्कैन हो रहा है…", "subtitle": "इसमें 30–90 सेकंड लग सकते हैं।" },
+  "error": { "title": "कुछ गलत हो गया", "retry": "पुनः प्रयास करें" },
+  "settings": { "title": "सेटिंग्स", "theme": "थीम", "themePreset": "प्रीसेट थीम", "customColors": "कस्टम रंग", "primaryColor": "प्राथमिक रंग", "secondaryColor": "द्वितीयक रंग", "glowColor": "ग्लो रंग", "glowIntensity": "ग्लो तीव्रता", "font": "फ़ॉन्ट परिवार", "language": "भाषा", "country": "देश और क्षेत्र", "defaultCountry": "डिफ़ॉल्ट देश", "sidebar": "साइडबार स्थिति", "sidebarLeft": "बाईं ओर", "sidebarRight": "दाईं ओर", "profile": "प्रोफाइल सेटिंग्स", "save": "परिवर्तन सहेजें", "saved": "✓ सहेजा गया!" },
+  "profile": { "fullName": "पूरा नाम", "email": "ईमेल पता", "phone": "फ़ोन नंबर", "website": "कंपनी वेबसाइट", "country": "देश", "language": "पसंदीदा भाषा" },
+  "login": { "title": "वापसी पर स्वागत", "subtitle": "अपने LeadRadar खाते में साइन इन करें", "email": "ईमेल पता", "password": "पासवर्ड", "signin": "साइन इन करें", "noAccount": "खाता नहीं है?", "signupLink": "साइन अप करें", "signupTitle": "खाता बनाएं", "signupSubtitle": "LeadRadar से जुड़ें और लीड्स जनरेट करना शुरू करें", "fullName": "पूरा नाम", "phone": "फ़ोन नंबर", "website": "कंपनी वेबसाइट", "confirmPassword": "पासवर्ड की पुष्टि करें", "haveAccount": "पहले से खाता है?", "signinLink": "साइन इन करें", "passwordMismatch": "पासवर्ड मेल नहीं खाते", "passwordTooShort": "पासवर्ड कम से कम 8 अक्षर का होना चाहिए", "invalidEmail": "कृपया एक वैध ईमेल पता दर्ज करें", "invalidPhone": "कृपया एक वैध फ़ोन नंबर दर्ज करें", "invalidWebsite": "कृपया एक वैध वेबसाइट URL दर्ज करें", "fillAll": "कृपया सभी आवश्यक फ़ील्ड भरें" },
+  "footer": { "powered": "द्वारा संचालित", "privacy": "गोपनीयता नीति", "terms": "नियम और शर्तें" },
+  "signout": "साइन आउट",
+  "dropdown": { "profile": "प्रोफाइल", "settings": "सेटिंग्स", "billing": "बिलिंग", "logout": "साइन आउट" },
+  "dashboard": { "totalLeads": "कुल लीड्स", "hotLeads": "हॉट लीड्स", "warmLeads": "वार्म लीड्स", "coldLeads": "कोल्ड लीड्स", "todayLeads": "आज जनरेट किए", "recentSearches": "हाल की खोजें", "noSearches": "अभी तक कोई हालिया खोज नहीं।", "startSearch": "अपने पहले लीड्स जनरेट करके शुरू करें" },
+  "companies": { "title": "कंपनियाँ", "subtitle": "आपकी लीड खोजों से मिली कंपनियाँ", "empty": "अभी तक कोई कंपनी नहीं। लीड्स जनरेट करें।" },
+  "analytics": { "title": "विश्लेषण", "subtitle": "आपकी लीड जनरेशन प्रदर्शन" },
+  "messages": { "title": "संदेश", "subtitle": "आपका आउटरीच इनबॉक्स", "empty": "अभी तक कोई संदेश नहीं।" }
+}
