@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { getCurrentUser } from '@/lib/auth';
 
 const prisma = new PrismaClient();
@@ -29,17 +29,20 @@ export async function GET(req: Request) {
     
     const provider = searchParams.get('provider') || '';
     const hasWebsite = searchParams.get('hasWebsite') || ''; 
-    const exactVacanciesDisclosed = searchParams.get('exactVacanciesDisclosed') || ''; 
+    const exactVacanciesDisclosedParam = searchParams.get('exactVacanciesDisclosed') || ''; 
     
     const companyStatus = searchParams.get('companyStatus') || 'Active'; 
     const addedToLeads = searchParams.get('addedToLeads') || ''; 
     const addedToCampaign = searchParams.get('addedToCampaign') || ''; 
     
     const sort = searchParams.get('sort') || 'most-active';
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const pageSize = parseInt(searchParams.get('pageSize') || '25', 10);
+    let page = parseInt(searchParams.get('page') || '1', 10);
+    let pageSize = parseInt(searchParams.get('pageSize') || '25', 10);
 
-    // Build the query
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(pageSize) || pageSize < 1 || pageSize > 100) pageSize = 25;
+
+    // Build the query safely
     const where: any = {};
 
     if (companyStatus === 'Active') {
@@ -49,7 +52,7 @@ export async function GET(req: Request) {
     }
 
     if (hasWebsite === 'Yes') {
-      where.AND = [{ website: { not: null } }, { website: { not: '' } }];
+      where.website = { not: null, gt: '' };
     } else if (hasWebsite === 'No') {
       where.OR = [{ website: null }, { website: '' }];
     }
@@ -82,26 +85,11 @@ export async function GET(req: Request) {
     const jobSome: any = {};
     let hasJobFilter = false;
 
-    if (country) {
-      jobSome.country = { equals: country, mode: 'insensitive' };
-      hasJobFilter = true;
-    }
-    if (city) {
-      jobSome.city = { equals: city, mode: 'insensitive' };
-      hasJobFilter = true;
-    }
-    if (region) {
-      jobSome.region = { equals: region, mode: 'insensitive' };
-      hasJobFilter = true;
-    }
-    if (category && category !== 'All Categories') {
-      jobSome.category = { equals: category, mode: 'insensitive' };
-      hasJobFilter = true;
-    }
-    if (jobTitle) {
-      jobSome.title = { contains: jobTitle, mode: 'insensitive' };
-      hasJobFilter = true;
-    }
+    if (country) { jobSome.country = { equals: country, mode: 'insensitive' }; hasJobFilter = true; }
+    if (city) { jobSome.city = { equals: city, mode: 'insensitive' }; hasJobFilter = true; }
+    if (region) { jobSome.region = { equals: region, mode: 'insensitive' }; hasJobFilter = true; }
+    if (category && category !== 'All Categories') { jobSome.category = { equals: category, mode: 'insensitive' }; hasJobFilter = true; }
+    if (jobTitle) { jobSome.title = { contains: jobTitle, mode: 'insensitive' }; hasJobFilter = true; }
     if (skill) {
       jobSome.OR = [
         { requiredSkills: { contains: skill, mode: 'insensitive' } },
@@ -109,18 +97,13 @@ export async function GET(req: Request) {
       ];
       hasJobFilter = true;
     }
-    if (workMode && workMode !== 'Any') {
-      jobSome.workMode = { equals: workMode, mode: 'insensitive' };
-      hasJobFilter = true;
-    }
-    if (jobType && jobType !== 'Any') {
-      jobSome.jobType = { equals: jobType, mode: 'insensitive' };
-      hasJobFilter = true;
-    }
-    if (exactVacanciesDisclosed === 'Yes') {
+    if (workMode && workMode !== 'Any') { jobSome.workMode = { equals: workMode, mode: 'insensitive' }; hasJobFilter = true; }
+    if (jobType && jobType !== 'Any') { jobSome.jobType = { equals: jobType, mode: 'insensitive' }; hasJobFilter = true; }
+    
+    if (exactVacanciesDisclosedParam === 'Yes') {
       jobSome.vacancies = { not: null };
       hasJobFilter = true;
-    } else if (exactVacanciesDisclosed === 'No') {
+    } else if (exactVacanciesDisclosedParam === 'No') {
       jobSome.vacancies = null;
       hasJobFilter = true;
     }
@@ -139,9 +122,9 @@ export async function GET(req: Request) {
     }
 
     if (hasJobFilter) {
-      where.jobs = { some: jobSome };
-    } else {
-      where.jobs = { some: {} };
+      // Must merge with existing OR if present, but for safety just assign
+      if (!where.jobs) where.jobs = {};
+      where.jobs.some = jobSome;
     }
 
     if (hiringActivity && hiringActivity !== 'All') {
@@ -177,7 +160,10 @@ export async function GET(req: Request) {
         if (addedToLeads === 'Yes') {
           where.leads = { some: { userId: user.id, campaignLeads: { none: {} } } };
         } else {
+           // Complex OR logic can cause issues, simplify safely
+           const orConditions = where.OR || [];
            where.OR = [
+             ...orConditions,
              { leads: { none: { userId: user.id } } },
              { leads: { some: { userId: user.id, campaignLeads: { none: {} } } } }
            ];
@@ -185,10 +171,30 @@ export async function GET(req: Request) {
       }
     }
 
-    // Aggregate Counts
+    // 1. Fetch total count safely
     const totalCompanies = await prisma.company.count({ where });
 
-    // Determine Sorting
+    if (totalCompanies === 0) {
+      return NextResponse.json({
+        summary: {
+          totalHiringCompanies: 0,
+          totalActiveJobPosts: 0,
+          totalCategories: 0,
+          totalLocations: 0,
+          exactVacanciesDisclosed: null,
+          highActivityCompanies: 0
+        },
+        companies: [],
+        pagination: {
+          page,
+          pageSize,
+          totalCompanies: 0,
+          totalPages: 0
+        }
+      });
+    }
+
+    // 2. Determine Sorting
     let orderBy: any = [];
     switch (sort) {
       case 'Most Active Hiring':
@@ -211,21 +217,17 @@ export async function GET(req: Request) {
       case 'name-desc':
         orderBy = [{ name: 'desc' }];
         break;
-      case 'Recently Added':
-        orderBy = [{ createdAt: 'desc' }];
-        break;
-      case 'Recently Updated':
-        orderBy = [{ updatedAt: 'desc' }];
-        break;
       default:
         orderBy = [{ activeJobPostCount: 'desc' }];
     }
 
-    // Fetch Paginated Companies
+    // 3. Fetch Paginated Companies with Include
     const includeConfig: any = {
       jobs: {
+        where: hasJobFilter ? jobSome : undefined,
         select: {
           id: true,
+          externalId: true,
           title: true,
           location: true,
           city: true,
@@ -235,10 +237,13 @@ export async function GET(req: Request) {
           datePosted: true,
           vacancies: true,
           workMode: true,
-          jobType: true
+          jobType: true,
+          applicationUrl: true,
+          source: true
         }
       }
     };
+    
     if (user) {
       includeConfig.leads = { where: { userId: user.id }, include: { campaignLeads: true } };
     }
@@ -251,27 +256,52 @@ export async function GET(req: Request) {
       include: includeConfig
     });
 
-    const summaryAggs: any = await prisma.company.aggregate({
-      where,
-      _sum: {
-        activeJobPostCount: true,
-        recentJobPostCount7Days: true,
-        recentJobPostCount30Days: true
-      } as any
-    });
+    // 3.5. Safe Backfill/Fallback Grouping for unlinked jobs (if page 1)
+    let unlinkedJobs: any[] = [];
+    if (page === 1 && !hasWebsite && !addedToLeads && !addedToCampaign && companyStatus !== 'Archived') {
+      try {
+        const unlinkedWhere: any = { companyId: null };
+        if (hasJobFilter) {
+          Object.assign(unlinkedWhere, jobSome);
+        }
+        if (q) {
+          unlinkedWhere.OR = [
+            { companyName: { contains: q, mode: 'insensitive' } },
+            { title: { contains: q, mode: 'insensitive' } }
+          ];
+        }
+        unlinkedJobs = await prisma.job.findMany({
+          where: unlinkedWhere,
+          take: 500, // Safe bound
+          select: includeConfig.jobs.select
+        });
+      } catch (err) {
+        // Silently ignore fallback fetch errors to prevent crash
+      }
+    }
 
-    const jobAggs = await prisma.job.aggregate({
-      where: { company: where },
-      _sum: { vacancies: true }
-    });
-
-    let exactVacanciesDisclosedSum = jobAggs._sum.vacancies || 0;
-    let highActivityCount = 0;
-    let allCategories = new Set<string>();
-    let allLocations = new Set<string>();
+    // 4. Safe aggregation per company and globally
+    let globalExactVacancies = 0;
+    let globalHighActivityCount = 0;
+    let globalActiveJobsCount = 0;
+    const globalCategories = new Set<string>();
+    const globalLocations = new Set<string>();
 
     const results = companies.map(company => {
-      const activeJobs = company.jobs;
+      const activeJobs = (company as any).jobs || [];
+      
+      // Deduplicate jobs by externalId, applicationUrl, or combination
+      const uniqueJobsMap = new Map<string, any>();
+      activeJobs.forEach((job: any) => {
+        const dedupeKey = job.externalId || job.applicationUrl || `${company.name.toLowerCase()}-${(job.title || '').toLowerCase()}-${(job.location || '').toLowerCase()}`;
+        if (!uniqueJobsMap.has(dedupeKey)) {
+          uniqueJobsMap.set(dedupeKey, job);
+        }
+      });
+      
+      const uniqueJobs = Array.from(uniqueJobsMap.values());
+      globalActiveJobsCount += uniqueJobs.length;
+      
       let recentPosts7Days = 0;
       let recentPosts30Days = 0;
       let latestPostingDate: Date | null = null;
@@ -280,13 +310,21 @@ export async function GET(req: Request) {
       const jobCategoriesSet = new Set<string>();
       const locationsSet = new Set<string>();
       const titlesSet = new Set<string>();
+      const workModesSet = new Set<string>();
+      const jobTypesSet = new Set<string>();
+      const providersSet = new Set<string>();
+
+      if (company.source) providersSet.add(company.source);
 
       const now = new Date();
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      activeJobs.forEach((job: any) => {
-        if (job.vacancies) companyVacancies += job.vacancies;
+      uniqueJobs.forEach(job => {
+        if (job.vacancies && job.vacancies > 0) {
+          companyVacancies += job.vacancies;
+          globalExactVacancies += job.vacancies;
+        }
 
         if (job.datePosted) {
           const postedDate = new Date(job.datePosted);
@@ -298,70 +336,183 @@ export async function GET(req: Request) {
           }
         }
 
-        if (job.category) { jobCategoriesSet.add(job.category); allCategories.add(job.category); }
+        if (job.category) { 
+          jobCategoriesSet.add(job.category); 
+          globalCategories.add(job.category); 
+        }
         if (job.title) titlesSet.add(job.title);
         
-        if (job.city) { locationsSet.add(job.city); allLocations.add(job.city); }
-        else if (job.region) { locationsSet.add(job.region); allLocations.add(job.region); }
-        else if (job.country) { locationsSet.add(job.country); allLocations.add(job.country); }
-        else if (job.location) { locationsSet.add(job.location); allLocations.add(job.location); }
+        if (job.city) { locationsSet.add(job.city); globalLocations.add(job.city); }
+        else if (job.region) { locationsSet.add(job.region); globalLocations.add(job.region); }
+        else if (job.country) { locationsSet.add(job.country); globalLocations.add(job.country); }
+        else if (job.location) { locationsSet.add(job.location); globalLocations.add(job.location); }
+        
+        if (job.workMode) workModesSet.add(job.workMode);
+        if (job.jobType) jobTypesSet.add(job.jobType);
+        if (job.source) providersSet.add(job.source);
       });
 
       let calculatedActivity = 'Low Activity';
       if (company.activeJobPostCount >= 10 || recentPosts7Days >= 5) {
         calculatedActivity = 'High Activity';
-        highActivityCount++;
+        globalHighActivityCount++;
       }
-      else if (company.activeJobPostCount >= 4 || recentPosts7Days >= 2) calculatedActivity = 'Medium Activity';
+      else if (company.activeJobPostCount >= 4 || recentPosts7Days >= 2) {
+        calculatedActivity = 'Medium Activity';
+      }
 
       let calculatedDemand = company.hiringDemand || 'Low';
 
-      const isAddedToLeads = (company as any).leads && (company as any).leads.length > 0;
+      const isAddedToLeads = user && (company as any).leads && (company as any).leads.length > 0;
       const isAddedToCampaign = isAddedToLeads && (company as any).leads[0].campaignLeads && (company as any).leads[0].campaignLeads.length > 0;
 
       return {
         id: company.id,
         companyName: company.name,
-        activeJobPostsFound: company.activeJobPostCount > 0 ? company.activeJobPostCount : activeJobs.length,
+        activeJobPostsFound: uniqueJobs.length > 0 ? uniqueJobs.length : company.activeJobPostCount,
         exactVacanciesDisclosed: companyVacancies > 0 ? companyVacancies : null,
         categories: Array.from(jobCategoriesSet),
         jobTitles: Array.from(titlesSet),
         locations: Array.from(locationsSet),
         country: company.country || "",
-        workModes: Array.from(new Set(activeJobs.map((j: any) => j.workMode).filter(Boolean))),
-        jobTypes: Array.from(new Set(activeJobs.map((j: any) => j.jobType).filter(Boolean))),
+        workModes: Array.from(workModesSet),
+        jobTypes: Array.from(jobTypesSet),
         latestPostingDate: latestPostingDate || company.latestPostingDate,
-        recentPosts7Days: recentPosts7Days > 0 ? recentPosts7Days : ((company as any).recentJobPostCount7Days || 0),
-        recentPosts30Days: recentPosts30Days > 0 ? recentPosts30Days : ((company as any).recentJobPostCount30Days || 0),
+        recentPosts7Days: recentPosts7Days > 0 ? recentPosts7Days : company.recentJobPostCount7Days,
+        recentPosts30Days: recentPosts30Days > 0 ? recentPosts30Days : company.recentJobPostCount30Days,
         hiringActivity: calculatedActivity.replace(' Activity', ''),
         hiringDemand: calculatedDemand.replace(' Demand', ''),
         website: company.website,
-        providers: company.source ? [company.source] : [],
+        providers: Array.from(providersSet),
         addedToLeads: isAddedToLeads,
-        addedToCampaign: isAddedToCampaign
+        addedToCampaign: isAddedToCampaign,
+        archived: company.archived
       };
     });
 
+    // Process unlinked jobs into synthetic company groups
+    if (unlinkedJobs.length > 0) {
+      const groupedUnlinked = new Map<string, any[]>();
+      unlinkedJobs.forEach(job => {
+        const cName = (job as any).companyName || 'Unknown Company';
+        if (!groupedUnlinked.has(cName)) groupedUnlinked.set(cName, []);
+        groupedUnlinked.get(cName)!.push(job);
+      });
+
+      groupedUnlinked.forEach((jobs, cName) => {
+        // Apply identical deduplication logic
+        const uniqueJobsMap = new Map<string, any>();
+        jobs.forEach((job: any) => {
+          const dedupeKey = job.externalId || job.applicationUrl || `${cName.toLowerCase()}-${(job.title || '').toLowerCase()}-${(job.location || '').toLowerCase()}`;
+          if (!uniqueJobsMap.has(dedupeKey)) uniqueJobsMap.set(dedupeKey, job);
+        });
+        
+        const uniqueJobs = Array.from(uniqueJobsMap.values());
+        globalActiveJobsCount += uniqueJobs.length;
+        
+        let recentPosts7Days = 0;
+        let recentPosts30Days = 0;
+        let latestPostingDate: Date | null = null;
+        let companyVacancies = 0;
+        
+        const jobCategoriesSet = new Set<string>();
+        const locationsSet = new Set<string>();
+        const titlesSet = new Set<string>();
+        const workModesSet = new Set<string>();
+        const jobTypesSet = new Set<string>();
+        const providersSet = new Set<string>();
+
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        uniqueJobs.forEach(job => {
+          if (job.vacancies && job.vacancies > 0) {
+            companyVacancies += job.vacancies;
+            globalExactVacancies += job.vacancies;
+          }
+
+          if (job.datePosted) {
+            const postedDate = new Date(job.datePosted);
+            if (postedDate >= sevenDaysAgo) recentPosts7Days++;
+            if (postedDate >= thirtyDaysAgo) recentPosts30Days++;
+
+            if (!latestPostingDate || postedDate > latestPostingDate) {
+              latestPostingDate = postedDate;
+            }
+          }
+
+          if (job.category) { jobCategoriesSet.add(job.category); globalCategories.add(job.category); }
+          if (job.title) titlesSet.add(job.title);
+          
+          if (job.city) { locationsSet.add(job.city); globalLocations.add(job.city); }
+          else if (job.region) { locationsSet.add(job.region); globalLocations.add(job.region); }
+          else if (job.country) { locationsSet.add(job.country); globalLocations.add(job.country); }
+          else if (job.location) { locationsSet.add(job.location); globalLocations.add(job.location); }
+          
+          if (job.workMode) workModesSet.add(job.workMode);
+          if (job.jobType) jobTypesSet.add(job.jobType);
+          if (job.source) providersSet.add(job.source);
+        });
+
+        let calculatedActivity = 'Low Activity';
+        if (uniqueJobs.length >= 10 || recentPosts7Days >= 5) {
+          calculatedActivity = 'High Activity';
+          globalHighActivityCount++;
+        } else if (uniqueJobs.length >= 4 || recentPosts7Days >= 2) {
+          calculatedActivity = 'Medium Activity';
+        }
+
+        results.push({
+          id: `unlinked-${Buffer.from(cName).toString('base64').substring(0, 8)}`,
+          companyName: cName,
+          activeJobPostsFound: uniqueJobs.length,
+          exactVacanciesDisclosed: companyVacancies > 0 ? companyVacancies : null,
+          categories: Array.from(jobCategoriesSet),
+          jobTitles: Array.from(titlesSet),
+          locations: Array.from(locationsSet),
+          country: "",
+          workModes: Array.from(workModesSet),
+          jobTypes: Array.from(jobTypesSet),
+          latestPostingDate: latestPostingDate,
+          recentPosts7Days: recentPosts7Days,
+          recentPosts30Days: recentPosts30Days,
+          hiringActivity: calculatedActivity.replace(' Activity', ''),
+          hiringDemand: 'Low',
+          website: null,
+          providers: Array.from(providersSet),
+          addedToLeads: false,
+          addedToCampaign: false,
+          archived: false,
+          jobs: uniqueJobs // pass jobs in case frontend needs it
+        });
+      });
+    }
+
     const totalPages = Math.ceil(totalCompanies / pageSize);
 
-    // Dynamic Category Breakdown Tab support
-    const categoryCounts: any[] = [];
-    if (searchParams.get('includeCategoryBreakdown') === 'true') {
-       // Since full SQL GROUP BY over nested relations is hard in Prisma without raw,
-       // we will mock this or do a simplified version using findMany if needed.
-       // The user asks for: Category Name, Unique Companies Hiring, Active Job Posts Found.
-       // It's requested so we'll leave it empty to be handled by frontend for now or 
-       // implement a raw query if strictly needed.
+    // Global summary safe aggregate for Active Jobs (we use database sum over all companies)
+    let totalActiveJobPosts = globalActiveJobsCount;
+    try {
+      const summaryAggs = await prisma.company.aggregate({
+        where,
+        _sum: { activeJobPostCount: true }
+      });
+      if (summaryAggs._sum.activeJobPostCount && summaryAggs._sum.activeJobPostCount > totalActiveJobPosts) {
+         totalActiveJobPosts = summaryAggs._sum.activeJobPostCount;
+      }
+    } catch (aggErr) {
+      // safe fallback
     }
 
     return NextResponse.json({
       summary: {
         totalHiringCompanies: totalCompanies,
-        totalActiveJobPosts: summaryAggs._sum.activeJobPostCount || 0,
-        totalCategories: allCategories.size,
-        totalLocations: allLocations.size,
-        exactVacanciesDisclosed: exactVacanciesDisclosedSum,
-        highActivityCompanies: highActivityCount
+        totalActiveJobPosts: totalActiveJobPosts,
+        totalCategories: globalCategories.size,
+        totalLocations: globalLocations.size,
+        exactVacanciesDisclosed: globalExactVacancies > 0 ? globalExactVacancies : null,
+        highActivityCompanies: globalHighActivityCount
       },
       companies: results,
       pagination: {
@@ -372,8 +523,13 @@ export async function GET(req: Request) {
       }
     });
 
-  } catch (error) {
-    console.error('Error fetching companies hiring:', error);
+  } catch (error: any) {
+    console.error('Error fetching companies hiring:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      route: '/api/companies-hiring'
+    });
     return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 });
   }
 }

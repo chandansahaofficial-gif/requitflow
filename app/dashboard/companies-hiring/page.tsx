@@ -88,14 +88,18 @@ function CompaniesHiringContent() {
     try {
       const qs = searchParams.toString();
       const res = await fetch(`/api/companies-hiring?${qs}&includeCategoryBreakdown=true`);
-      if (!res.ok) throw new Error('Failed to fetch companies');
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('Your session has expired. Please log in again.');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Company hiring data could not be loaded.');
+      }
       const data = await res.json();
       setCompanies(data.companies || []);
       setSummary(data.summary || {});
       setPagination(data.pagination || {});
       setCategoryBreakdown(data.categoryCounts || []);
     } catch (err: any) {
-      setError('Company hiring data could not be loaded. Please try again.');
+      setError(err.message || 'Company hiring data could not be loaded. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -485,9 +489,14 @@ function CompaniesHiringContent() {
         </div>
       )}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex gap-3 items-start text-red-400">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p>{error}</p>
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex gap-3 items-center justify-between text-red-400">
+          <div className="flex gap-3 items-start">
+            <AlertCircle size={20} className="shrink-0 mt-0.5" />
+            <p>{error}</p>
+          </div>
+          <button onClick={fetchData} className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-md text-sm transition-colors border border-red-500/30 whitespace-nowrap">
+            Retry
+          </button>
         </div>
       )}
 
