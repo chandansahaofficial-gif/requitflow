@@ -174,7 +174,7 @@ export async function POST(req: Request) {
       csvContent += `${escapeCSV((recentPosts30Days > 0 ? recentPosts30Days : ((c as any).recentJobPostCount30Days || 0)).toString())},`;
       csvContent += `${escapeCSV(Array.from(jobCategoriesSet).join('; '))},`;
       csvContent += `${escapeCSV(Array.from(titlesSet).join('; '))},`;
-      csvContent += `${escapeCSV(latestPostingDate ? latestPostingDate.toISOString() : (c.latestPostingDate ? new Date(c.latestPostingDate).toISOString() : ''))},`;
+      csvContent += `${escapeCSV(latestPostingDate ? (latestPostingDate as Date).toISOString() : ((c as any).latestPostingDate ? new Date((c as any).latestPostingDate).toISOString() : ''))},`;
       csvContent += `${escapeCSV(calculatedActivity)},`;
       csvContent += `${escapeCSV(c.hiringDemand || 'Low')},`;
       csvContent += `${escapeCSV(companyVacancies > 0 ? companyVacancies.toString() : '')},`;
