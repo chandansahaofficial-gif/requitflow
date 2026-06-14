@@ -212,6 +212,30 @@ function CompaniesHiringContent() {
     } catch (e) {} finally { setActionProgress(null); }
   };
 
+  const handleBulkDelete = async () => {
+    const count = selectedIds.size;
+    if (!confirm(`⚠️ PERMANENTLY DELETE ${count} ${count === 1 ? 'company' : 'companies'} and ALL their jobs?\n\nThis cannot be undone.`)) return;
+    try {
+      setActionProgress(`Deleting ${count} ${count === 1 ? 'company' : 'companies'}...`);
+      const res = await fetch('/api/companies-hiring/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyIds: Array.from(selectedIds) })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSelectedIds(new Set());
+        fetchData();
+      } else {
+        alert(data.error || 'Delete failed.');
+      }
+    } catch (e) {
+      alert('Delete failed. Please try again.');
+    } finally {
+      setActionProgress(null);
+    }
+  };
+
   const handleApifySync = async () => {
     if (!apifyKeyword.trim()) {
       alert('Keyword is required');
@@ -681,6 +705,13 @@ function CompaniesHiringContent() {
                 <Inbox size={14} /> Restore Selected
               </button>
             )}
+            <button
+              onClick={handleBulkDelete}
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs rounded-md border border-red-500 flex items-center gap-1 whitespace-nowrap font-medium transition-colors"
+              title="Permanently delete selected companies and all their jobs"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
           </div>
         </div>
       )}

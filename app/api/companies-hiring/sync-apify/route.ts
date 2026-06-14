@@ -4,6 +4,10 @@ import { prisma } from '@/lib/prisma';
 import { runApifyActor } from '@/lib/hiring/apify';
 import { normalizeApifyJob } from '@/lib/hiring/normalization';
 
+// Allow up to 5 minutes for Apify actor runs (Vercel Pro/Hobby max)
+export const maxDuration = 300;
+
+
 const ALL_SOURCES = ['linkedin', 'indeed', 'google_jobs', 'remote_jobs', 'world_jobs'] as const;
 
 export async function GET() {

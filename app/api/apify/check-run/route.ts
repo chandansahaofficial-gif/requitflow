@@ -3,6 +3,10 @@ import { getRunStatus, getDatasetItems } from '@/services/apify';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
+// Allow up to 5 minutes — Apify runs can take a while
+export const maxDuration = 300;
+
+
 // Extract the first valid email from a website's HTML (homepage + /contact fallback)
 async function extractEmailFromWebsite(websiteUrl: string): Promise<string | null> {
   const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
