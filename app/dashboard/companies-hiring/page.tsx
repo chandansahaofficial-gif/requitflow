@@ -49,13 +49,14 @@ function CompaniesHiringContent() {
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isApifySyncModalOpen, setIsApifySyncModalOpen] = useState(false);
-  const [apifySource, setApifySource] = useState('LinkedIn Jobs');
+  const [apifySource, setApifySource] = useState('all');
   const [apifyKeyword, setApifyKeyword] = useState('');
   const [apifyLocation, setApifyLocation] = useState('');
   const [apifyCountry, setApifyCountry] = useState('Worldwide');
   const [apifyMaxResults, setApifyMaxResults] = useState('25');
   const [isApifySyncing, setIsApifySyncing] = useState(false);
   const [apifySyncResult, setApifySyncResult] = useState<any>(null);
+  const [apifyConnectionStatus, setApifyConnectionStatus] = useState<any>(null);
   
   // Data State
   const [companies, setCompanies] = useState<any[]>([]);
@@ -98,7 +99,16 @@ function CompaniesHiringContent() {
     setError(null);
     try {
       const qs = searchParams.toString();
-      const res = await fetch(`/api/companies-hiring?${qs}&includeCategoryBreakdown=true`);
+      const [res, apifyStatusRes] = await Promise.all([
+        fetch(`/api/companies-hiring?${qs}&includeCategoryBreakdown=true`, { credentials: 'include' }),
+        fetch('/api/companies-hiring/sync-apify', { credentials: 'include' })
+      ]);
+
+      if (apifyStatusRes.ok) {
+        const apifyData = await apifyStatusRes.json();
+        setApifyConnectionStatus(apifyData);
+      }
+
       if (!res.ok) {
         if (res.status === 401) throw new Error('Your session has expired. Please log in again.');
         const errorData = await res.json().catch(() => ({}));
@@ -212,6 +222,7 @@ function CompaniesHiringContent() {
     try {
       const res = await fetch('/api/companies-hiring/sync-apify', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: apifySource,
@@ -376,15 +387,147 @@ function CompaniesHiringContent() {
           <p className="text-slate-400">Find companies actively hiring, open role count, hiring category, and add them to campaigns.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => setIsApifySyncModalOpen(true)} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-            <RefreshCw size={16} /> Refresh Apify Job Data
-          </button>
-          <button onClick={() => setIsRefreshModalOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border border-slate-700">
-            <RefreshCw size={16} /> Refresh Hiring Data
-          </button>
           <Link href="/dashboard/job-search" className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
             Go to Job Search <ArrowRight size={16} />
           </Link>
+        </div>
+      </div>
+
+      {/* Top Sync Panel */}
+      <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-xl">
+        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <RefreshCw size={20} className="text-green-500" /> Sync Job Data
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Source</label>
+            <select className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-3 py-2" value={apifySource} onChange={(e) => setApifySource(e.target.value)}>
+              <option value="all">⚡ All Sources (Run All)</option>
+              <option value="linkedin">LinkedIn Jobs</option>
+              <option value="indeed">Indeed Jobs</option>
+              <option value="google_jobs">Google Jobs</option>
+              <option value="remote_jobs">Remote Jobs</option>
+              <option value="world_jobs">World Jobs</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Keyword</label>
+            <input type="text" placeholder="e.g. Software Developer" className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-3 py-2" value={apifyKeyword} onChange={(e) => setApifyKeyword(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1">Location</label>
+            <input type="text" placeholder="e.g. India, United States, Worldwide" className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-3 py-2" value={apifyLocation} onChange={(e) => setApifyLocation(e.target.value)} />
+          </div>
+          <div className="flex gap-2 col-span-1 md:col-span-2">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-slate-400 mb-1">Country</label>
+              <select className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-3 py-2" value={apifyCountry} onChange={(e) => setApifyCountry(e.target.value)}>
+                <option value="Worldwide">Worldwide</option>
+                <option value="India">India</option>
+                <option value="United States">United States</option>
+                <option value="United Kingdom">United Kingdom</option>
+                <option value="Canada">Canada</option>
+                <option value="Australia">Australia</option>
+                <option value="UAE">UAE</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-slate-400 mb-1">Max Results</label>
+              <select className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-3 py-2" value={apifyMaxResults} onChange={(e) => setApifyMaxResults(e.target.value)}>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+              </select>
+            </div>
+          </div>
+          <div className="md:col-span-5 flex justify-between items-center mt-2">
+             <div className="text-sm">
+                {isApifySyncing ? (
+                  /* Animated waiting logo */
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-8 h-8 flex items-center justify-center">
+                      {/* Outer radar ring */}
+                      <span className="absolute inset-0 rounded-full border-2 border-purple-500/30 animate-ping" style={{ animationDuration: '1.4s' }} />
+                      {/* Middle ring */}
+                      <span className="absolute inset-1 rounded-full border border-purple-400/50 animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.3s' }} />
+                      {/* Spinning arc */}
+                      <svg className="absolute inset-0 w-8 h-8 animate-spin" style={{ animationDuration: '1s' }} viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="12" fill="none" stroke="url(#apifyGrad)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="28 50" />
+                        <defs>
+                          <linearGradient id="apifyGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#a855f7" />
+                            <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      {/* Center dot */}
+                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-purple-300 font-semibold text-xs tracking-wide">Fetching from Apify…</span>
+                      <span className="text-slate-500 text-[10px]">This may take up to 5 minutes</span>
+                    </div>
+                  </div>
+                ) : apifySyncResult ? (
+                  <div className="space-y-2">
+                    <span className={apifySyncResult.success ? 'text-green-400 text-sm font-medium' : 'text-red-400 text-sm'}>
+                      {apifySyncResult.success
+                        ? `✓ ${apifySyncResult.jobsFound} jobs found, ${(apifySyncResult.companiesUpdated || 0) + (apifySyncResult.companiesCreated || 0)} companies updated.`
+                        : (apifySyncResult.message || apifySyncResult.error || 'Sync failed.')}
+                    </span>
+                    {/* Per-source breakdown for All Sources run */}
+                    {apifySyncResult.sourceBreakdown && (
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {Object.entries(apifySyncResult.sourceBreakdown).map(([src, info]: [string, any]) => (
+                          <span
+                            key={src}
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${
+                              info.status === 'success'
+                                ? 'bg-green-900/30 text-green-400 border-green-800'
+                                : 'bg-red-900/30 text-red-400 border-red-800'
+                            }`}
+                            title={info.error || `${info.jobsFound} jobs`}
+                          >
+                            {src === 'linkedin' ? 'LinkedIn' : src === 'indeed' ? 'Indeed' : src === 'google_jobs' ? 'Google' : src === 'remote_jobs' ? 'Remote' : 'World'}
+                            {' '}{info.status === 'success' ? `✓ ${info.jobsFound}` : '✗'}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : apifyConnectionStatus ? (
+                  apifyConnectionStatus.status === 'Apify connected' ? (
+                    apifyConnectionStatus.actors?.[apifySource] ? (
+                      /* Apify connected badge with animated logo */
+                      <div className="flex items-center gap-2 bg-green-950/40 border border-green-800/50 rounded-full px-3 py-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
+                        </span>
+                        <svg width="44" height="12" viewBox="0 0 44 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Apify">
+                          <path d="M3.2 9H0L3.6 0h2.8L10 9H6.8L6.2 7.2H3.8L3.2 9zM5 2.8 4.3 5.6h1.4L5 2.8zM11 9V0h3.8c1.8 0 2.9 1 2.9 2.6 0 1.7-1.1 2.7-2.9 2.7H13V9h-2zm2-5.6V3.7h1.5c.6 0 .9.3.9.85 0 .5-.3.85-.9.85H13zm7.5 5.6V0H23c2.8 0 4.5 1.6 4.5 4.5S25.8 9 23 9h-2.5zm2-1.7H23c1.7 0 2.5-1 2.5-2.8S24.7 1.7 23 1.7h-.5v5.6zm7.5 1.7V0H35v3.5h3V0h2v9h-2V5.2h-3V9h-2zm10-9h2v9h-2V0z" fill="#4ade80"/>
+                        </svg>
+                        <span className="text-green-400 text-xs font-medium">Connected</span>
+                      </div>
+                    ) : (
+                      <span className="text-yellow-400 text-xs">⚠ Apify actor is not configured for this source.</span>
+                    )
+                  ) : (
+                    <span className="text-red-400 text-xs">{apifyConnectionStatus.status}</span>
+                  )
+                ) : null}
+             </div>
+             <button onClick={handleApifySync} disabled={isApifySyncing} className="bg-purple-600 hover:bg-purple-500 disabled:opacity-60 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+               {isApifySyncing ? (
+                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+               ) : (
+                 <RefreshCw size={16} />
+               )}
+               {isApifySyncing ? 'Fetching…' : 'Refresh Job Data'}
+             </button>
+          </div>
         </div>
       </div>
 
@@ -741,18 +884,102 @@ function CompaniesHiringContent() {
           </div>
         )
       ) : (
-        /* Category Breakdown Tab */
-        <div className="glass p-6 rounded-2xl border border-slate-800">
-          <h2 className="text-xl font-bold text-white mb-6">Category Breakdown</h2>
-          <p className="text-slate-400 mb-6">Grouping currently active matching jobs by category is supported by backend filtering. Select a category in the toolbar to drill down into companies.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-             {/* Stub for breakdown until dynamic grouping is fully injected */}
-             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                <h3 className="font-bold text-white">All Matching Companies</h3>
-                <p className="text-sm text-slate-400 mt-1">Found {summary.uniqueCompaniesFound} companies with {summary.activeJobPostsFound} active jobs.</p>
-                <button onClick={() => updateUrlParams({ tab: 'companies' })} className="mt-4 text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1">View Companies <ArrowRight size={14}/></button>
-             </div>
+        /* Category Breakdown Tab — real data from API */
+        <div className="space-y-6">
+          <div className="glass p-6 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white">Job Category Breakdown</h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  Distribution of {summary.totalOpenRolesFound || 0} open roles across {summary.totalHiringCompanies || 0} hiring companies
+                </p>
+              </div>
+              <button
+                onClick={() => updateUrlParams({ tab: 'companies' })}
+                className="text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1 border border-purple-500/30 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                View Companies <ArrowRight size={14}/>
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1,2,3,4,5].map(i => (
+                  <div key={i} className="h-16 bg-slate-800 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : categoryBreakdown.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Briefcase className="text-slate-500" size={28} />
+                </div>
+                <p className="text-slate-400">No category data available yet.</p>
+                <p className="text-slate-500 text-sm mt-1">Sync job data using the Refresh Job Data button above.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {categoryBreakdown.map((cat: any, idx: number) => {
+                  const colors = [
+                    'bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+                    'bg-pink-500', 'bg-orange-500', 'bg-cyan-500', 'bg-red-500',
+                    'bg-indigo-500', 'bg-teal-500'
+                  ];
+                  const barColor = colors[idx % colors.length];
+                  return (
+                    <button
+                      key={cat.name}
+                      onClick={() => updateUrlParams({ category: cat.name, tab: 'companies', page: '1' })}
+                      className="w-full text-left bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/40 rounded-xl p-4 transition-all group"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-2.5 h-2.5 rounded-full ${barColor} shrink-0`} />
+                          <span className="font-semibold text-white text-sm group-hover:text-purple-300 transition-colors">
+                            {cat.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-slate-400 text-xs">{cat.percentage}%</span>
+                          <span className="font-mono text-white font-bold text-sm bg-slate-800 px-2.5 py-0.5 rounded-md border border-slate-700">
+                            {cat.count} {cat.count === 1 ? 'role' : 'roles'}
+                          </span>
+                          <ArrowRight size={14} className="text-slate-600 group-hover:text-purple-400 transition-colors" />
+                        </div>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                          style={{ width: `${cat.percentage}%` }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
+
+          {/* Work Mode breakdown */}
+          {!isLoading && (summary.remoteRoles > 0 || summary.hybridRoles > 0 || summary.onsiteRoles > 0) && (
+            <div className="glass p-6 rounded-2xl border border-slate-800">
+              <h3 className="text-lg font-bold text-white mb-4">Work Mode Distribution</h3>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-blue-900/20 border border-blue-800/50 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-black text-blue-400">{summary.remoteRoles || 0}</p>
+                  <p className="text-xs text-blue-300 mt-1 font-medium">Remote</p>
+                </div>
+                <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-black text-yellow-400">{summary.hybridRoles || 0}</p>
+                  <p className="text-xs text-yellow-300 mt-1 font-medium">Hybrid</p>
+                </div>
+                <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-black text-slate-300">{summary.onsiteRoles || 0}</p>
+                  <p className="text-xs text-slate-400 mt-1 font-medium">On-site</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -996,21 +1223,7 @@ function CompaniesHiringContent() {
         </div>
       )}
 
-      {/* Refresh Modal */}
-      {isRefreshModalOpen && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsRefreshModalOpen(false)}></div>
-          <div className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl text-center">
-            <RefreshCw size={48} className="text-purple-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Refresh Hiring Data</h3>
-            <p className="text-slate-400 text-sm mb-6">This will query connected providers (Jooble/Adzuna) using your current search filters to find the latest jobs and recalculate hiring metrics for these companies. Proceed?</p>
-            <div className="flex justify-center gap-3">
-              <button onClick={() => setIsRefreshModalOpen(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm">Cancel</button>
-              <button onClick={handleRefreshData} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-medium">Start Refresh</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Removed Refresh Modal */}
 
       {/* View Jobs Drawer */}
       {selectedCompanyIdForDrawer && (
@@ -1066,81 +1279,7 @@ function CompaniesHiringContent() {
 
       {/* Existing Drawers and Modals... */}
 
-      {/* Apify Sync Modal */}
-      {isApifySyncModalOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-800">
-              <h3 className="font-bold text-white flex items-center gap-2"><RefreshCw size={18} className="text-green-500"/> Sync Apify Job Data</h3>
-              <button onClick={() => setIsApifySyncModalOpen(false)} className="text-slate-400 hover:text-white"><X size={20} /></button>
-            </div>
-            <div className="p-4 space-y-4">
-              {apifySyncResult && (
-                <div className={`p-3 rounded-lg border text-sm ${apifySyncResult.success ? 'bg-green-900/20 border-green-900/50 text-green-400' : 'bg-red-900/20 border-red-900/50 text-red-400'}`}>
-                  {apifySyncResult.message}
-                  {apifySyncResult.success && (
-                     <div className="mt-2 text-xs">
-                       Jobs: {apifySyncResult.jobsFound} | Companies: {apifySyncResult.companiesFound} <br/>
-                       Created: {apifySyncResult.companiesCreated} | Updated: {apifySyncResult.companiesUpdated} <br/>
-                       Duplicates Skipped: {apifySyncResult.duplicatesSkipped}
-                     </div>
-                  )}
-                </div>
-              )}
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Source</label>
-                <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" value={apifySource} onChange={(e) => setApifySource(e.target.value)}>
-                  <option>LinkedIn Jobs</option>
-                  <option>Indeed Jobs</option>
-                  <option>Google Jobs</option>
-                  <option>Remote Jobs</option>
-                  <option>World Jobs</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Keyword</label>
-                <input type="text" placeholder="e.g. Software Developer" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" value={apifyKeyword} onChange={(e) => setApifyKeyword(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Location</label>
-                <input type="text" placeholder="e.g. India, United States, Worldwide" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" value={apifyLocation} onChange={(e) => setApifyLocation(e.target.value)} />
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Country</label>
-                  <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" value={apifyCountry} onChange={(e) => setApifyCountry(e.target.value)}>
-                    <option>Worldwide</option>
-                    <option>India</option>
-                    <option>United States</option>
-                    <option>United Kingdom</option>
-                    <option>Canada</option>
-                    <option>Australia</option>
-                    <option>UAE</option>
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Max Results</label>
-                  <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" value={apifyMaxResults} onChange={(e) => setApifyMaxResults(e.target.value)}>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                    <option value="250">250</option>
-                    <option value="500">500</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-slate-800 flex justify-end gap-3">
-              <button onClick={() => setIsApifySyncModalOpen(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium">Close</button>
-              <button onClick={handleApifySync} disabled={isApifySyncing} className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-2">
-                {isApifySyncing ? <span className="animate-spin text-white">⏳</span> : <RefreshCw size={14} />}
-                {isApifySyncing ? 'Syncing...' : 'Start Sync'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Removed Sync Modal */}
 
     </div>
   );

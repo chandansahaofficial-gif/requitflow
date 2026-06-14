@@ -3,6 +3,43 @@ import { getRunStatus, getDatasetItems } from '@/services/apify';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
+// Extract the first valid email from a website's HTML (homepage + /contact fallback)
+async function extractEmailFromWebsite(websiteUrl: string): Promise<string | null> {
+  const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  // Skip these generic/system addresses
+  const SKIP = /noreply|no-reply|donotreply|support@|info@example|test@|admin@example/i;
+
+  const pagesToTry: string[] = [];
+  try {
+    const base = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);
+    pagesToTry.push(base.origin);               // homepage
+    pagesToTry.push(`${base.origin}/contact`);  // contact page
+    pagesToTry.push(`${base.origin}/about`);    // about page
+  } catch {
+    return null;
+  }
+
+  for (const url of pagesToTry) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LeadRadar/1.0)' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const matches = html.match(EMAIL_RE) || [];
+      for (const email of matches) {
+        if (!SKIP.test(email) && email.length < 80) {
+          return email.toLowerCase();
+        }
+      }
+    } catch {
+      // timeout or network error — skip this page
+    }
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -43,6 +80,17 @@ export async function POST(req: Request) {
       if (item.website) score += 30;
       if (item.phone || item.phoneUnformatted) score += 30;
 
+      // Extract email from the business website
+      let email: string | null = null;
+      if (item.website) {
+        try {
+          email = await extractEmailFromWebsite(item.website);
+          if (email) score += 10; // bonus for having a reachable email
+        } catch {
+          // silently skip if website is unreachable
+        }
+      }
+
       let tier = "Cold";
       if (score >= 80) tier = "Hot";
       else if (score >= 50) tier = "Warm";
@@ -78,14 +126,15 @@ export async function POST(req: Request) {
       const lead = await prisma.lead.create({
         data: {
           userId: user.id,
-          businessName: item.title,
+          businessName: item.title || item.name,
           phone: item.phone || item.phoneUnformatted || null,
+          email: email,
           website: item.website || null,
           address: item.address || item.street || null,
           rating: item.totalScore || item.rating || null,
           reviewCount: item.reviewsCount || null,
-          googleMapsLink: item.url || null,
-          category: item.categoryName || null,
+          googleMapsLink: item.url || item.googleMapsUrl || null,
+          category: item.categoryName || item.category || null,
           country: country || null,
           location: location || item.city || null,
           leadScore: score,

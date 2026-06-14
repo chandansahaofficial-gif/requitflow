@@ -8,7 +8,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
     }
 
     const { campaignId } = await req.json();

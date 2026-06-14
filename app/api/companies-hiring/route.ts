@@ -41,6 +41,9 @@ export async function GET(req: Request) {
 
   try {
     const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
+    }
     const { searchParams } = new URL(req.url);
     
     // Parse parameters
@@ -297,6 +300,17 @@ export async function GET(req: Request) {
       }
     }
 
+    // Build sorted category breakdown array for the UI
+    const categoryCounts = Object.entries(globalCategoryCounts)
+      .map(([name, count]) => ({ name, count, percentage: 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    // Add percentage relative to total jobs
+    const totalJobs = categoryCounts.reduce((sum, c) => sum + c.count, 0);
+    if (totalJobs > 0) {
+      categoryCounts.forEach(c => { c.percentage = Math.round((c.count / totalJobs) * 100); });
+    }
+
     return NextResponse.json({
       summary: {
         totalHiringCompanies: finalTotal,
@@ -307,6 +321,7 @@ export async function GET(req: Request) {
         topHiringCategory
       },
       companies: paginatedCompanies,
+      categoryCounts,
       pagination: {
         page,
         pageSize,

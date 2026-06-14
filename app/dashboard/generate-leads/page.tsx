@@ -76,7 +76,8 @@ export default function GenerateLeadsPage() {
               id: l.id,
               name: l.businessName,
               phone: l.phone || 'N/A',
-              website: l.website || 'N/A',
+              email: l.email || null,
+              website: l.website || null,
               address: l.address || 'N/A',
               rating: l.rating || 'N/A',
               url: l.googleMapsLink || 'N/A',
@@ -123,9 +124,9 @@ export default function GenerateLeadsPage() {
   const handleExportCSV = () => {
     if (selectedLeads.length === 0) return alert("Please select at least one lead to export.");
     const dataToExport = leads.filter(l => selectedLeads.includes(l.id));
-    const headers = "Business Name,Phone,Website,Address,Rating,Google Maps Link,Lead Score,Lead Tier,AI Insight,Status\n";
+    const headers = "Business Name,Phone,Email,Website,Address,Rating,Google Maps Link,Lead Score,Lead Tier,AI Insight,Status\n";
     const rows = dataToExport.map(l => 
-      `"${l.name.replace(/"/g, '""')}","${l.phone}","${l.website}","${l.address.replace(/"/g, '""')}","${l.rating}","${l.url}","${l.score}","${l.tier}","${l.insight.replace(/"/g, '""')}","${l.status}"`
+      `"${l.name.replace(/"/g, '""')}","${l.phone}","${l.email || ''}","${l.website || ''}","${l.address.replace(/"/g, '""')}","${l.rating}","${l.url}","${l.score}","${l.tier}","${l.insight.replace(/"/g, '""')}","${l.status}"`
     ).join("\n");
     const blob = new Blob([headers + rows], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -252,6 +253,7 @@ export default function GenerateLeadsPage() {
                   </th>
                   <th className="px-6 py-4 font-medium">Business Name</th>
                   <th className="px-6 py-4 font-medium">Contact</th>
+                  <th className="px-6 py-4 font-medium">Email</th>
                   <th className="px-6 py-4 font-medium">Score</th>
                   <th className="px-6 py-4 font-medium">Tier</th>
                   <th className="px-6 py-4 font-medium">AI Insight</th>
@@ -272,6 +274,18 @@ export default function GenerateLeadsPage() {
                     <td className="px-6 py-4">
                       <div>{lead.phone}</div>
                       <div className="text-xs text-slate-500">{lead.website || 'No website'}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {lead.email ? (
+                        <a
+                          href={`mailto:${lead.email}`}
+                          className="text-blue-400 hover:text-blue-300 text-xs font-mono underline underline-offset-2 transition-colors"
+                        >
+                          {lead.email}
+                        </a>
+                      ) : (
+                        <span className="text-slate-600 text-xs">Not found</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-mono text-blue-400">{lead.score}</span>/100

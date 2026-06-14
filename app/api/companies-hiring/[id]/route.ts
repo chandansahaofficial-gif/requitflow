@@ -8,7 +8,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
     }
 
     const companyId = params.id;
@@ -37,7 +37,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
+    }
 
     // We do a soft delete (archive)
     const company = await prisma.company.update({
@@ -55,7 +57,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
+    }
 
     const body = await req.json().catch(() => ({}));
     if (body.action === 'restore') {

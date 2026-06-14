@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { searchJoobleJobs, normalizeJoobleJob, removeDuplicateJobs } from '@/lib/jooble';
 import { getAdzunaCountryCode, normalizeAdzunaJob } from '@/lib/job-mapping';
 
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
+    }
 
     const body = await req.json();
     const { 
@@ -27,40 +28,37 @@ export async function POST(req: Request) {
     let rawJobs = [];
     let normalizedJobs = [];
 
-    // 1. Try Jooble
-    try {
-      const joobleData = await searchJoobleJobs(searchParams);
-      rawJobs = joobleData.jobs || [];
-      normalizedJobs = rawJobs.map(normalizeJoobleJob);
-    } catch (joobleError) {
-      console.warn("Jooble refresh failed, falling back to Adzuna:", joobleError);
+    // Fallback to Adzuna
+    const countryCode = getAdzunaCountryCode(country || process.env.ADZUNA_DEFAULT_COUNTRY || 'gb');
+    if (countryCode && process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY) {
+      const baseUrl = `https://api.adzuna.com/v1/api/jobs/${countryCode}/search/1`;
+      const params = new URLSearchParams({
+        app_id: process.env.ADZUNA_APP_ID,
+        app_key: process.env.ADZUNA_APP_KEY,
+        results_per_page: '50',
+        sort_by: 'date',
+      });
+      if (searchParams.jobTitle) params.append('what', searchParams.jobTitle);
+      if (searchParams.location) params.append('where', searchParams.location);
+      if (searchParams.category) params.append('category', searchParams.category);
       
-      // 2. Fallback to Adzuna
-      const countryCode = getAdzunaCountryCode(country || process.env.ADZUNA_DEFAULT_COUNTRY || 'gb');
-      if (countryCode && process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY) {
-        const baseUrl = `https://api.adzuna.com/v1/api/jobs/${countryCode}/search/1`;
-        const params = new URLSearchParams({
-          app_id: process.env.ADZUNA_APP_ID,
-          app_key: process.env.ADZUNA_APP_KEY,
-          results_per_page: '50',
-          sort_by: 'date',
-        });
-        if (searchParams.jobTitle) params.append('what', searchParams.jobTitle);
-        if (searchParams.location) params.append('where', searchParams.location);
-        if (searchParams.category) params.append('category', searchParams.category);
-        
-        const apiUrl = `${baseUrl}?${params.toString()}`;
-        const response = await fetch(apiUrl);
-        if (response.ok) {
-          const data = await response.json();
-          rawJobs = data.results || [];
-          normalizedJobs = rawJobs.map((j: any) => normalizeAdzunaJob(j));
-        }
+      const apiUrl = `${baseUrl}?${params.toString()}`;
+      const response = await fetch(apiUrl);
+      if (response.ok) {
+        const data = await response.json();
+        rawJobs = data.results || [];
+        normalizedJobs = rawJobs.map((j: any) => normalizeAdzunaJob(j));
       }
     }
 
     // Deduplicate from API response
-    normalizedJobs = removeDuplicateJobs(normalizedJobs);
+    const seen = new Set();
+    normalizedJobs = normalizedJobs.filter((job: any) => {
+      if (!job.externalId) return true;
+      if (seen.has(job.externalId)) return false;
+      seen.add(job.externalId);
+      return true;
+    });
 
     let newJobsCount = 0;
     let updatedJobsCount = 0;
