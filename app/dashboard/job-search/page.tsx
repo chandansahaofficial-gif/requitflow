@@ -11,6 +11,7 @@ import Link from 'next/link';
 export default function JobSearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -38,6 +39,7 @@ export default function JobSearchPage() {
   const handleSearch = async (pageNum = 1) => {
     setLoading(true);
     setError(null);
+    setHasSearched(true);
     try {
       const response = await fetch('/api/jobs/search', {
         method: 'POST',
@@ -352,7 +354,7 @@ export default function JobSearchPage() {
         </div>
       )}
 
-      {!loading && !error && results.length === 0 && (
+      {!loading && !error && hasSearched && results.length === 0 && (
         <div className="glass rounded-2xl p-12 border border-slate-800 text-center flex flex-col items-center justify-center">
           <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
             <Search className="text-slate-400" size={32} />

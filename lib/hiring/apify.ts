@@ -49,22 +49,19 @@ function buildActorInput(source: string, keyword: string, location: string, coun
 
     case 'remote_jobs':
       // orgupdate/remote-co-jobs-scraper
+      // NOTE: Do NOT use "maxItems" as a body field — Apify treats it as a platform-level
+      // billing cap and throws "max-items-must-be-greater-than-zero" if it conflicts.
+      // The limit is set via the URL query param instead (see runApifyActor below).
       return {
         includeKeyword: keyword,
-        maxItems: maxResults,
+        maxCrawledPages: Math.ceil(maxResults / 10), // ~10 results per page
       };
 
     case 'world_jobs':
-      // automation-lab/multi-ats-jobs-scraper — REQUIRES "companies" array of domain objects
-      // Since we don't have a static list, we pass keyword as a filter instead
-      return {
-        companies: [],           // empty triggers broad search mode if supported
-        filters: {
-          keywords: keyword,
-          location: location || undefined,
-        },
-        maxJobs: maxResults,
-      };
+      // automation-lab/multi-ats-jobs-scraper requires specific company ATS domains.
+      // It is not suitable for broad keyword searches without a company list.
+      // Until a proper company list is configured, this source is not supported for general search.
+      throw new Error('World Jobs source requires a configured list of company ATS domains. Please use LinkedIn, Indeed, or Google Jobs instead.');
 
     default:
       return { keyword, location, country, maxResults };
@@ -105,21 +102,29 @@ export async function runApifyActor(source: string, keyword: string, location: s
   // Apify REST API requires "owner/actor-name" → "owner~actor-name" in the URL
   const encodedActorId = actorId.replace('/', '~');
 
-  const input = buildActorInput(source, keyword, location, country, maxResults);
+  // Safety guard: maxResults must always be >= 1
+  const safeMaxResults = Math.max(1, Math.floor(maxResults));
 
-  // Start the actor run
-  const runResponse = await fetch(`https://api.apify.com/v2/acts/${encodedActorId}/runs`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(input)
-  });
+  const input = buildActorInput(source, keyword, location, country, safeMaxResults);
+
+  // Start the actor run.
+  // maxItems is passed as a URL query param (Apify v2 REST API platform-level cap).
+  // This prevents the "max-items-must-be-greater-than-zero" 400 error.
+  const runResponse = await fetch(
+    `https://api.apify.com/v2/acts/${encodedActorId}/runs?maxItems=${safeMaxResults}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(input)
+    }
+  );
 
   if (!runResponse.ok) {
     const errText = await runResponse.text().catch(() => '');
-    throw new Error(`Apify run failed with status: ${runResponse.status}${errText ? ` — ${errText.slice(0, 200)}` : ''}`);
+    throw new Error(`Apify run failed with status: ${runResponse.status}${errText ? ` — ${errText.slice(0, 300)}` : ''}`);
   }
 
   const runData = await runResponse.json();
@@ -162,7 +167,7 @@ export async function runApifyActor(source: string, keyword: string, location: s
 
   // Fetch dataset items
   const datasetResponse = await fetch(
-    `https://api.apify.com/v2/datasets/${datasetId}/items?limit=${maxResults}`,
+    `https://api.apify.com/v2/datasets/${datasetId}/items?limit=${safeMaxResults}`,
     { headers: { 'Authorization': `Bearer ${token}` } }
   );
 

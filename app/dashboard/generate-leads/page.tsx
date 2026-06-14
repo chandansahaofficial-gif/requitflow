@@ -133,7 +133,7 @@ export default function GenerateLeadsPage() {
     const a = document.createElement('a');
     a.setAttribute('hidden', '');
     a.setAttribute('href', url);
-    a.setAttribute('download', 'recruitflow_leads_export.csv');
+    a.setAttribute('download', 'funnelzen_leads_export.csv');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

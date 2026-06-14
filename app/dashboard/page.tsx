@@ -51,7 +51,7 @@ export default function DashboardOverview() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
-          <p className="text-slate-400">Welcome to your RecruitFlow AI command center.</p>
+          <p className="text-slate-400">Welcome to your FunnelZen AI command center.</p>
         </div>
       </div>
 

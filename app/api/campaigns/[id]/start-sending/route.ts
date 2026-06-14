@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const { id } = await params;
+
   try {
     const campaign = await prisma.campaign.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'Active' }
     });
 
@@ -17,7 +19,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Or we hit the local API asynchronously.
     
     // Fire and forget
-    fetch(`${req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/campaigns/${params.id}/process-due-emails`, {
+    fetch(`${req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/campaigns/${id}/process-due-emails`, {
       method: 'POST',
       headers: { cookie: req.headers.get('cookie') || '' }
     }).catch(console.error);

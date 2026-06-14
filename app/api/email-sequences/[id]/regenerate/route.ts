@@ -42,8 +42,8 @@ Return ONLY valid JSON with no markdown blocks. Format:
       headers: {
         "Authorization": `Bearer ${openrouterKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://recruitflow.ai",
-        "X-Title": "RecruitFlow AI"
+        "HTTP-Referer": "https://funnelzen.ai",
+        "X-Title": "FunnelZen AI"
       },
       body: JSON.stringify({
         model: openrouterModel,

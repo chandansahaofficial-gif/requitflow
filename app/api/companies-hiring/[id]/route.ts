@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { getCurrentUser } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
-
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
     }
 
-    const companyId = params.id;
+    const { id: companyId } = await params; // Next.js 15 requires awaiting params
     if (companyId.startsWith('unlinked-')) {
         return NextResponse.json({ error: 'Cannot view details for synthetic group directly.' }, { status: 400 });
     }
@@ -34,16 +32,18 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
     }
 
+    const { id } = await params; // Next.js 15 requires awaiting params
+
     // We do a soft delete (archive)
     const company = await prisma.company.update({
-      where: { id: params.id },
+      where: { id },
       data: { archived: true }
     });
 
@@ -54,17 +54,19 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
     }
 
+    const { id } = await params; // Next.js 15 requires awaiting params
     const body = await req.json().catch(() => ({}));
+
     if (body.action === 'restore') {
       const company = await prisma.company.update({
-        where: { id: params.id },
+        where: { id },
         data: { archived: false }
       });
       return NextResponse.json({ message: 'Company restored successfully', company });

@@ -7,7 +7,7 @@ export async function generateText(apiKey: string, prompt: string, model: string
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
-      'X-Title': 'RecruitFlow AI',
+      'X-Title': 'FunnelZen AI',
     },
     body: JSON.stringify({
       model: model,

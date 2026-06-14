@@ -29,7 +29,7 @@ export default function CampaignsPage() {
         setShowModal(false);
         setNewCampaign({ name: "", goal: "" });
         setEditingCampaignId(null);
-        window.location.reload();
+        fetchCampaigns();
       } else {
         alert(data.error || "Failed to save campaign. Check terminal logs.");
       }
@@ -73,31 +73,32 @@ export default function CampaignsPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchCampaigns = async () => {
-      try {
-        const res = await fetch("/api/campaigns");
-        const data = await res.json();
-        if (data.campaigns) {
-          const mapped = data.campaigns.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            goal: c.goal,
-            target: c.targetAudience || "N/A",
-            leads: c._count?.leads || 0,
-            emailsSent: c._count?.emailSequences || 0,
-            replies: c._count?.replies || 0,
-            booked: c._count?.bookedCalls || 0,
-            status: c.status
-          }));
-          setCampaigns(mapped);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const fetchCampaigns = async () => {
+    try {
+      const res = await fetch("/api/campaigns");
+      const data = await res.json();
+      if (data.campaigns) {
+        const mapped = data.campaigns.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          goal: c.goal,
+          target: c.targetAudience || "N/A",
+          leads: c._count?.leads || 0,
+          emailsSent: c._count?.emailSequences || 0,
+          replies: c._count?.replies || 0,
+          booked: c._count?.bookedCalls || 0,
+          status: c.status
+        }));
+        setCampaigns(mapped);
       }
-    };
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchCampaigns();
   }, []);
 

@@ -2,20 +2,21 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const { leadId, allSelectedLeads } = await req.json().catch(() => ({}));
+    const { id: campaignId } = await params;
 
     // Verify campaign ownership
-    const campaign = await prisma.campaign.findUnique({ where: { id: params.id } });
+    const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
     if (!campaign || campaign.userId !== user.id) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    let whereClause: any = { campaignId: params.id, userId: user.id };
+    let whereClause: any = { campaignId, userId: user.id };
     
     if (leadId) {
       // Approve all for a specific lead

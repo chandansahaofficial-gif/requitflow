@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser();
@@ -12,7 +12,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Verify the lead belongs to this user before deleting
     const lead = await prisma.lead.findFirst({
@@ -35,7 +35,7 @@ export async function DELETE(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser();
@@ -43,7 +43,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
 
     const lead = await prisma.lead.findFirst({

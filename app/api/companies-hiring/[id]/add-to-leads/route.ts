@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { getCurrentUser } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
-
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized. Please log in again.' }, { status: 401 });
     }
 
-    const companyId = params.id;
+    const { id: companyId } = await params; // Next.js 15 requires awaiting params
     if (companyId.startsWith('unlinked-')) {
         return NextResponse.json({ error: 'Cannot add synthetic group to leads.' }, { status: 400 });
     }

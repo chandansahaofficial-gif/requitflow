@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { getCurrentUser } from '@/lib/auth';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 function deriveCategory(title: string | null | undefined, currentCategory: string | null | undefined): string {
   if (currentCategory && currentCategory !== 'Uncategorized' && currentCategory !== 'Other') {

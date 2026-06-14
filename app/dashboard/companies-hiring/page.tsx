@@ -136,7 +136,10 @@ function CompaniesHiringContent() {
   const fetchCampaigns = async () => {
     try {
       const res = await fetch('/api/campaigns');
-      if (res.ok) setCampaigns(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setCampaigns(data.campaigns || []);
+      }
     } catch (e) {}
   };
 
@@ -181,7 +184,11 @@ function CompaniesHiringContent() {
   const handleArchiveCompany = async (id: string) => {
     if (!confirm("This company will be removed from the active Companies Hiring view. Existing jobs, client leads, campaign history, saved jobs, applications, and analytics will remain unchanged.")) return;
     try {
-      await fetch(`/api/companies-hiring/${id}`, { method: 'DELETE', body: JSON.stringify({ archiveReason: 'Archived by user' }) });
+      await fetch(`/api/companies-hiring/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archiveReason: 'Archived by user' })
+      });
       fetchData();
     } catch (e) {}
   };
@@ -431,7 +438,6 @@ function CompaniesHiringContent() {
               <option value="indeed">Indeed Jobs</option>
               <option value="google_jobs">Google Jobs</option>
               <option value="remote_jobs">Remote Jobs</option>
-              <option value="world_jobs">World Jobs</option>
             </select>
           </div>
           <div>

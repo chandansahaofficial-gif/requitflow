@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const campaignId = params.id;
+  const { id: campaignId } = await params;
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   const openrouterModel = process.env.OPENROUTER_MODEL || "google/gemini-1.5-pro";
 
@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     let successCount = 0;
     let failedCount = 0;
-    const failedLeads = [];
+    const failedLeads: string[] = [];
 
     // Helper to generate for a single lead
     const generateForLead = async (lead: any) => {
@@ -82,8 +82,8 @@ Format:
           headers: {
             "Authorization": `Bearer ${openrouterKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://recruitflow.ai",
-            "X-Title": "RecruitFlow AI"
+            "HTTP-Referer": "https://funnelzen.ai",
+            "X-Title": "FunnelZen AI"
           },
           body: JSON.stringify({
             model: openrouterModel,
@@ -114,7 +114,8 @@ Format:
               sequenceStep: seq.step,
               ctaText: seq.cta_text,
               ctaLink: seq.cta_link,
-              delayDays: seq.delay_days,
+              delayAmount: seq.delay_days ?? 0,
+              delayUnit: 'business_days',
               status: "Draft",
               approvalStatus: "Pending",
               aiOriginalSubject: seq.subject,

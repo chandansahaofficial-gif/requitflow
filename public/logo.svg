@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- Main background -->
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a0a2e"/>
+      <stop offset="100%" stop-color="#070A12"/>
+    </radialGradient>
+    <!-- Funnel gradient violet to cyan -->
+    <linearGradient id="funnelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <!-- Glow filter -->
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Outer glow -->
+    <filter id="outerGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Particle glow -->
+    <filter id="particleGlow">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Clip circle -->
+    <clipPath id="circleClip">
+      <circle cx="100" cy="100" r="90"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="#070A12"/>
+  <circle cx="100" cy="100" r="90" fill="url(#bg)"/>
+
+  <!-- Ambient glow rings -->
+  <circle cx="100" cy="100" r="88" fill="none" stroke="#8B5CF6" stroke-width="0.5" opacity="0.3"/>
+  <circle cx="100" cy="100" r="72" fill="none" stroke="#7C3AED" stroke-width="0.3" opacity="0.2"/>
+
+  <!-- Funnel top wide edge - horizontal lines -->
+  <!-- Row 1 (widest, top) -->
+  <line x1="35" y1="55" x2="165" y2="55" stroke="url(#funnelGrad)" stroke-width="3.5" stroke-linecap="round" filter="url(#glow)" opacity="0.9"/>
+  <!-- Row 2 -->
+  <line x1="48" y1="72" x2="152" y2="72" stroke="url(#funnelGrad)" stroke-width="3" stroke-linecap="round" filter="url(#glow)" opacity="0.85"/>
+  <!-- Row 3 -->
+  <line x1="62" y1="89" x2="138" y2="89" stroke="url(#funnelGrad)" stroke-width="2.5" stroke-linecap="round" filter="url(#glow)" opacity="0.8"/>
+  <!-- Row 4 -->
+  <line x1="76" y1="106" x2="124" y2="106" stroke="url(#funnelGrad)" stroke-width="2" stroke-linecap="round" filter="url(#glow)" opacity="0.75"/>
+  <!-- Row 5 (narrow) -->
+  <line x1="89" y1="120" x2="111" y2="120" stroke="url(#funnelGrad)" stroke-width="1.8" stroke-linecap="round" filter="url(#glow)" opacity="0.7"/>
+
+  <!-- Funnel vertical side lines (left) -->
+  <line x1="35" y1="55" x2="89" y2="120" stroke="url(#funnelGrad)" stroke-width="2" stroke-linecap="round" filter="url(#glow)" opacity="0.6"/>
+  <!-- Funnel vertical side lines (right) -->
+  <line x1="165" y1="55" x2="111" y2="120" stroke="url(#funnelGrad)" stroke-width="2" stroke-linecap="round" filter="url(#glow)" opacity="0.6"/>
+
+  <!-- Funnel neck/pipe -->
+  <rect x="95" y="120" width="10" height="22" rx="5" fill="url(#funnelGrad)" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- AI Sparkle node at the tip -->
+  <!-- Center dot -->
+  <circle cx="100" cy="152" r="7" fill="url(#funnelGrad)" filter="url(#outerGlow)" opacity="1"/>
+  <circle cx="100" cy="152" r="4" fill="#E9D5FF"/>
+
+  <!-- Sparkle lines -->
+  <line x1="100" y1="140" x2="100" y2="136" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" filter="url(#particleGlow)"/>
+  <line x1="100" y1="164" x2="100" y2="168" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" filter="url(#particleGlow)"/>
+  <line x1="88" y1="152" x2="84" y2="152" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" filter="url(#particleGlow)"/>
+  <line x1="112" y1="152" x2="116" y2="152" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" filter="url(#particleGlow)"/>
+  <line x1="92" y1="144" x2="89" y2="141" stroke="#A855F7" stroke-width="1.5" stroke-linecap="round" filter="url(#particleGlow)"/>
+  <line x1="108" y1="160" x2="111" y2="163" stroke="#A855F7" stroke-width="1.5" stroke-linecap="round" filter="url(#particleGlow)"/>
+  <line x1="108" y1="144" x2="111" y2="141" stroke="#A855F7" stroke-width="1.5" stroke-linecap="round" filter="url(#particleGlow)"/>
+  <line x1="92" y1="160" x2="89" y2="163" stroke="#A855F7" stroke-width="1.5" stroke-linecap="round" filter="url(#particleGlow)"/>
+
+  <!-- Floating data particles -->
+  <circle cx="60" cy="70" r="2.5" fill="#8B5CF6" filter="url(#particleGlow)" opacity="0.7"/>
+  <circle cx="140" cy="65" r="2" fill="#06B6D4" filter="url(#particleGlow)" opacity="0.6"/>
+  <circle cx="52" cy="88" r="1.5" fill="#A855F7" filter="url(#particleGlow)" opacity="0.5"/>
+  <circle cx="148" cy="85" r="2" fill="#7C3AED" filter="url(#particleGlow)" opacity="0.6"/>
+  <circle cx="75" cy="100" r="1.5" fill="#06B6D4" filter="url(#particleGlow)" opacity="0.4"/>
+  <circle cx="126" cy="98" r="1.5" fill="#8B5CF6" filter="url(#particleGlow)" opacity="0.4"/>
+
+  <!-- Outer ring accent -->
+  <circle cx="100" cy="100" r="92" fill="none" stroke="url(#funnelGrad)" stroke-width="1" opacity="0.4"/>
+</svg>

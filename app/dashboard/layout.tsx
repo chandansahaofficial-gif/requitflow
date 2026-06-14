@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, Users, UserPlus, Send, MessageSquare, 
@@ -49,10 +50,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen bg-background overflow-hidden text-foreground">
       {/* Sidebar */}
       <aside className="w-64 glass border-r border-slate-800 flex flex-col">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            RecruitFlow AI
-          </h1>
+        <div className="p-5 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-lg shadow-violet-500/20 ring-1 ring-violet-500/30">
+              <Image src="/logo.svg" alt="FunnelZen AI Logo" width={36} height={36} className="object-cover w-full h-full" />
+            </div>
+            <div>
+              <h1 className="text-lg font-extrabold bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent leading-tight tracking-tight">
+                FunnelZen AI
+              </h1>
+              <p className="text-[10px] text-slate-500 font-medium tracking-widest uppercase">Lead Intelligence</p>
+            </div>
+          </div>
         </div>
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => {

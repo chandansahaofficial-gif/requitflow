@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { generateSevenStepSequence } from '@/lib/campaign-generator';
 import { recommendNextSendTime } from '@/lib/scheduling';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { leadIds } = await req.json(); // Accept array of leadIds for batching
     
@@ -11,8 +11,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'No leads provided' }, { status: 400 });
     }
 
+    const { id } = await params;
+
     const campaign = await prisma.campaign.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { user: { include: { settings: true } } }
     });
 
