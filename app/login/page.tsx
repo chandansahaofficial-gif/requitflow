@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ArrowRight, UserPlus, LogIn } from "lucide-react";
@@ -8,6 +8,11 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Form state
   const [email, setEmail] = useState("");
@@ -46,6 +51,10 @@ export default function AuthPage() {
       setLoading(false);
     }
   };
+
+  if (!mounted) {
+    return <div className="flex h-screen items-center justify-center bg-[#070A12] relative overflow-hidden text-slate-200" />;
+  }
 
   return (
     <div className="flex h-screen items-center justify-center bg-[#070A12] relative overflow-hidden text-slate-200">

@@ -12,12 +12,15 @@ export default function AnalyticsPage() {
     const fetchAnalytics = async () => {
       try {
         const res = await fetch("/api/analytics/dashboard");
-        if (!res.ok) throw new Error("Failed");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.details || errData?.error || "Failed to load analytics");
+        }
         const json = await res.json();
         setData(json);
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
-        setError(true);
+        setError(err.message || "Unknown error");
       } finally {
         setLoading(false);
       }
@@ -31,8 +34,8 @@ export default function AnalyticsPage() {
         <h2 className="text-3xl font-bold text-white mb-2">Recruitment Analytics</h2>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 flex flex-col items-center justify-center text-center">
           <AlertCircle className="text-red-400 mb-4" size={32} />
-          <h3 className="text-xl font-bold text-white mb-2">Analytics data could not be loaded. Please try again.</h3>
-          <p className="text-red-300 max-w-md">There was an issue connecting to the database. Please check your connection and reload the page.</p>
+          <h3 className="text-xl font-bold text-white mb-2">Analytics data could not be loaded.</h3>
+          <p className="text-red-300 max-w-2xl font-mono text-sm bg-red-950/50 p-4 rounded-lg mt-2 whitespace-pre-wrap">{typeof error === 'string' ? error : "There was an issue connecting to the database."}</p>
         </div>
       </div>
     );

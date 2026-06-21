@@ -529,7 +529,7 @@ function CompaniesHiringContent() {
                   </div>
                 ) : apifyConnectionStatus ? (
                   apifyConnectionStatus.status === 'Apify connected' ? (
-                    apifyConnectionStatus.actors?.[apifySource] ? (
+                    (apifySource === 'all' ? Object.values(apifyConnectionStatus.actors || {}).some(Boolean) : apifyConnectionStatus.actors?.[apifySource]) ? (
                       /* Apify connected badge with animated logo */
                       <div className="flex items-center gap-2 bg-green-950/40 border border-green-800/50 rounded-full px-3 py-1.5">
                         <span className="relative flex h-2 w-2">

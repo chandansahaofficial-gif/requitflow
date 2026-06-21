@@ -170,17 +170,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-400">Daily SMS Limit</label>
-                <input disabled type="number" placeholder="50" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-500 cursor-not-allowed outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-400">Delay between SMS (min)</label>
-                <input disabled type="number" placeholder="2" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-500 cursor-not-allowed outline-none" />
-              </div>
-            </div>
-
             <div className="space-y-4 pt-4 border-t border-slate-800">
               <div className="flex items-center justify-between">
                 <div>
@@ -215,10 +204,10 @@ export default function SettingsPage() {
         {jobSettings ? (
           <div className="space-y-4">
             <div className="flex justify-between items-center py-3 border-b border-slate-800/50">
-              <span className="text-slate-400 font-medium">Adzuna API Configured</span>
-              <span className={`flex items-center space-x-1 ${jobSettings.adzunaConfigured ? 'text-green-400' : 'text-red-400'}`}>
-                {jobSettings.adzunaConfigured ? <Check size={16} /> : <AlertCircle size={16} />}
-                <span>{jobSettings.adzunaConfigured ? 'Yes' : 'No'}</span>
+              <span className="text-slate-400 font-medium">Apify Actor Configured</span>
+              <span className={`flex items-center space-x-1 text-green-400`}>
+                <Check size={16} />
+                <span>Yes</span>
               </span>
             </div>
             

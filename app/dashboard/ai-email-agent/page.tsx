@@ -107,9 +107,20 @@ export default function AIEmailAgentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status })
       });
-      if (res.ok) fetchCampaigns();
+      const data = await res.json();
+      if (res.ok) {
+        fetchCampaigns();
+      } else {
+        if (data.missingRequirements && data.missingRequirements.length > 0) {
+          const reqs = data.missingRequirements.map((r: string) => `\n• ${r}`).join("");
+          alert(`${data.error || "Your campaign is not ready yet:"}${reqs}`);
+        } else {
+          alert(data.error || "Failed to update campaign.");
+        }
+      }
     } catch (err) {
       console.error(err);
+      alert("An unexpected error occurred.");
     }
   };
 

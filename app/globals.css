@@ -66,7 +66,7 @@
     border-radius: 20px !important;
   }
 
-  button.bg-blue-600, button.btn-primary {
+  button.btn-primary {
     background: linear-gradient(135deg, #7C3AED, #2563EB) !important;
     box-shadow: 0 0 25px rgba(124, 58, 237, 0.35) !important;
     color: #FFFFFF !important;

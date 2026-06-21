@@ -66,7 +66,7 @@ export default function CandidatesDatabasePage() {
               <tr>
                 <th className="px-6 py-4 font-medium">Candidate</th>
                 <th className="px-6 py-4 font-medium">Skills & Details</th>
-                <th className="px-6 py-4 font-medium text-center">AI Match Score</th>
+                {/* <th className="px-6 py-4 font-medium text-center">AI Match Score</th> */}
                 <th className="px-6 py-4 font-medium">Status / Source</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
               </tr>
@@ -77,14 +77,14 @@ export default function CandidatesDatabasePage() {
                   <tr key={i} className="animate-pulse">
                     <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-32 mb-2"></div><div className="h-3 bg-slate-800 rounded w-20"></div></td>
                     <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-48 mb-2"></div><div className="h-3 bg-slate-800 rounded w-32"></div></td>
-                    <td className="px-6 py-4"><div className="h-8 bg-slate-800 rounded-full w-12 mx-auto"></div></td>
+                    {/* <td className="px-6 py-4"><div className="h-8 bg-slate-800 rounded-full w-12 mx-auto"></div></td> */}
                     <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-16 mb-2"></div><div className="h-3 bg-slate-800 rounded w-24"></div></td>
                     <td className="px-6 py-4"><div className="h-8 bg-slate-800 rounded w-full"></div></td>
                   </tr>
                 ))
               ) : filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center">
+                  <td colSpan={4} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="w-16 h-16 bg-slate-800/50 text-slate-500 flex items-center justify-center rounded-full mb-4">
                         <Users size={32} />
@@ -108,9 +108,9 @@ export default function CandidatesDatabasePage() {
                     </td>
                     <td className="px-6 py-4 max-w-xs">
                       <div className="text-xs text-slate-300 mb-2 font-medium line-clamp-1">{candidate.skills}</div>
-                      <div className="text-xs text-slate-500 italic line-clamp-2" title={candidate.aiSummary}>{candidate.aiSummary}</div>
+                      {/* <div className="text-xs text-slate-500 italic line-clamp-2" title={candidate.aiSummary}>{candidate.aiSummary}</div> */}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    {/* <td className="px-6 py-4 text-center">
                       <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm border ${
                         (candidate.matchScore || 0) >= 80 ? 'bg-green-500/10 text-green-400 border-green-500/30' : 
                         (candidate.matchScore || 0) >= 60 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : 
@@ -118,7 +118,7 @@ export default function CandidatesDatabasePage() {
                       }`}>
                         {candidate.matchScore || '--'}
                       </div>
-                    </td>
+                    </td> */}
                     <td className="px-6 py-4">
                       <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-1 inline-block">
                         {candidate.status}

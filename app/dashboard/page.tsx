@@ -18,20 +18,21 @@ export default function DashboardOverview() {
         const res = await fetch('/api/companies-hiring');
         if (res.ok) {
           const data = await res.json();
-          let activeJobPostsFound = 0;
+          const companies = data.companies || [];
+          const summary = data.summary || {};
+          
+          let activeJobPostsFound = summary.totalOpenRolesFound || 0;
           let highHiringActivityCompanies = 0;
-          let recentPosts7Days = 0;
+          let recentPosts7Days = 0; // Not fully tracked by this endpoint, but we prevent the crash
 
-          data.forEach((c: any) => {
-            activeJobPostsFound += c.activeJobPostsFound;
-            recentPosts7Days += c.recentPosts7Days;
-            if (c.hiringActivity === 'High Activity') {
+          companies.forEach((c: any) => {
+            if (c.hiringActivity === 'High' || c.hiringActivity === 'High Activity') {
               highHiringActivityCompanies++;
             }
           });
 
           setHiringStats({
-            companiesHiring: data.length,
+            companiesHiring: summary.totalHiringCompanies || 0,
             activeJobPostsFound,
             highHiringActivityCompanies,
             recentPosts7Days,

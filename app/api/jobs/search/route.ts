@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { getAdzunaCountryCode, normalizeAdzunaJob } from '@/lib/job-mapping';
-import { searchJoobleJobs, normalizeJoobleJob, removeDuplicateJobs } from '@/lib/jooble';
 import { prisma } from '@/lib/prisma';
 import { generateText } from '@/services/openrouter';
+import { runApifyActor } from '@/lib/hiring/apify';
+import { normalizeApifyJob } from '@/lib/hiring/normalization';
+
+// Increase max duration to allow Apify actors to finish
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   try {
@@ -26,71 +29,24 @@ export async function POST(req: Request) {
       datePosted
     } = body;
 
-    let providerUsed = 'Jooble';
-    let rawJobs = [];
-    let normalizedJobs = [];
-    let totalResults = 0;
-
-    // 1. Try Jooble
-    try {
-      const joobleData = await searchJoobleJobs(body);
-      rawJobs = joobleData.jobs || [];
-      totalResults = joobleData.totalCount || rawJobs.length;
-      normalizedJobs = rawJobs.map(normalizeJoobleJob);
-    } catch (joobleError) {
-      console.warn("Jooble search failed, falling back to Adzuna:", joobleError);
-      
-      // 2. Fallback to Adzuna
-      providerUsed = 'Adzuna';
-      const countryCode = getAdzunaCountryCode(country || process.env.ADZUNA_DEFAULT_COUNTRY || 'gb');
-      if (!countryCode) {
-        return NextResponse.json({ error: 'Job search is not available for the selected country.' }, { status: 400 });
-      }
-
-      const appId = process.env.ADZUNA_APP_ID;
-      const appKey = process.env.ADZUNA_APP_KEY;
-
-      if (!appId || !appKey) {
-         throw new Error("Both Jooble and Adzuna failed/missing credentials.");
-      }
-      
-      const baseUrl = `https://api.adzuna.com/v1/api/jobs/${countryCode}/search/${page}`;
-      const params = new URLSearchParams({
-        app_id: appId,
-        app_key: appKey,
-        results_per_page: resultsPerPage.toString(),
-        sort_by: 'date',
-      });
-
-      if (jobTitle) params.append('what', jobTitle);
-      if (location) params.append('where', location);
-      if (category) params.append('category', category);
-      if (salaryMin) params.append('salary_min', salaryMin.toString());
-      if (salaryMax) params.append('salary_max', salaryMax.toString());
-      if (jobType === 'Full-time') params.append('full_time', '1');
-      if (jobType === 'Part-time') params.append('part_time', '1');
-      if (jobType === 'Contract') params.append('contract', '1');
-      if (jobType === 'Permanent') params.append('permanent', '1');
-
-      if (datePosted === 'Last 24 hours') params.append('max_days_old', '1');
-      else if (datePosted === 'Last 3 days') params.append('max_days_old', '3');
-      else if (datePosted === 'Last 7 days') params.append('max_days_old', '7');
-      else if (datePosted === 'Last 14 days') params.append('max_days_old', '14');
-      else if (datePosted === 'Last 30 days') params.append('max_days_old', '30');
-
-      const apiUrl = `${baseUrl}?${params.toString()}`;
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        throw new Error('Adzuna API Error: ' + response.statusText);
-      }
-      const data = await response.json();
-      rawJobs = data.results || [];
-      totalResults = data.count || 0;
-      normalizedJobs = rawJobs.map((j: any) => normalizeAdzunaJob(j));
+    const token = process.env.APIFY_API_TOKEN;
+    if (!token) {
+      return NextResponse.json({ error: 'Apify API token is not configured.' }, { status: 500 });
     }
 
-    // Deduplicate
-    normalizedJobs = removeDuplicateJobs(normalizedJobs);
+    // Determine default source. Using linkedin as fallback if not specified
+    const source = 'linkedin';
+    let rawJobs = [];
+    let normalizedJobs = [];
+
+    // Run Apify Actor
+    try {
+      rawJobs = await runApifyActor(source, jobTitle || '', location || '', country || '', resultsPerPage);
+      normalizedJobs = rawJobs.map((j: any) => normalizeApifyJob(j, source)).filter(j => j.title !== 'Unknown Title');
+    } catch (apifyError: any) {
+      console.error("Apify search failed:", apifyError);
+      return NextResponse.json({ error: apifyError.message || 'Job search via Apify failed.' }, { status: 500 });
+    }
 
     // Save history
     await prisma.jobSearchHistory.create({
@@ -98,7 +54,7 @@ export async function POST(req: Request) {
         userId: user.id,
         searchFilters: JSON.stringify(body),
         countryCode: country || 'US',
-        totalResults: totalResults,
+        totalResults: normalizedJobs.length,
       }
     });
 
@@ -106,7 +62,7 @@ export async function POST(req: Request) {
     
     // Process jobs, save to DB
     for (const job of normalizedJobs) {
-      if (!job.applicationUrl) continue;
+      if (!job.applyUrl) continue;
       
       // Upsert company
       let company = null;
@@ -122,7 +78,7 @@ export async function POST(req: Request) {
               country: job.country,
               location: job.location,
               activeJobPostCount: 1,
-              latestPostingDate: job.datePosted
+              latestPostingDate: job.postedAt
             }
           });
         } else {
@@ -130,23 +86,23 @@ export async function POST(req: Request) {
             where: { id: company.id },
             data: {
               activeJobPostCount: { increment: 1 },
-              latestPostingDate: job.datePosted > (company.latestPostingDate || new Date(0)) ? job.datePosted : company.latestPostingDate
+              latestPostingDate: (job.postedAt && (!company.latestPostingDate || job.postedAt > company.latestPostingDate)) ? job.postedAt : company.latestPostingDate
             }
           });
         }
-        job.companyId = company.id;
       }
 
       // Check DB duplicate
       const existingJob = await prisma.job.findFirst({
         where: {
           OR: [
-            { externalId: job.externalId },
-            {
-              companyId: job.companyId,
+            job.sourceJobId ? { externalId: job.sourceJobId } : { id: 'impossible-id' },
+            { applicationUrl: job.applyUrl },
+            company ? {
+              companyId: company.id,
               title: job.title,
               location: job.location,
-            }
+            } : { id: 'impossible-id' }
           ]
         }
       });
@@ -157,44 +113,37 @@ export async function POST(req: Request) {
           where: { id: existingJob.id },
           data: {
             lastSeenAt: new Date(),
-            rawData: job.rawData,
           }
         });
       } else {
+        const workModeMap: Record<string, string> = {
+          'REMOTE': 'Remote',
+          'HYBRID': 'Hybrid',
+          'ONSITE': 'On-site'
+        };
+
         savedJob = await prisma.job.create({
           data: {
-             externalId: job.externalId,
-             companyId: job.companyId,
+             externalId: job.sourceJobId,
+             companyId: company ? company.id : null,
              source: job.source,
              title: job.title,
              category: job.category,
              description: job.description,
              location: job.location,
              city: job.city,
-             region: job.region,
              country: job.country,
-             workMode: job.workMode,
-             jobType: job.jobType,
-             contractType: job.contractType,
-             contractTime: job.contractTime,
-             salaryMin: job.salaryMin,
-             salaryMax: job.salaryMax,
-             salaryCurrency: job.salaryCurrency,
-             salaryDisclosed: job.salaryDisclosed,
-             requiredExperience: job.requiredExperience,
-             requiredSkills: job.requiredSkills,
-             preferredSkills: job.preferredSkills,
-             datePosted: job.datePosted,
-             applicationUrl: job.applicationUrl,
-             vacancies: job.vacancies,
-             candidatesNeeded: job.candidatesNeeded,
-             vacancyStatus: job.vacancyStatus,
-             vacancyEvidence: job.vacancyEvidence,
-             hiringUrgency: job.hiringUrgency,
-             hiringDemand: job.hiringDemand,
-             aiSummary: job.aiSummary,
-             rawData: job.rawData,
-             descriptionHash: job.descriptionHash
+             workMode: workModeMap[job.remoteType] || 'Unknown',
+             jobType: job.employmentType,
+             salaryMin: job.salaryMin ? parseFloat(job.salaryMin) : null,
+             salaryMax: job.salaryMax ? parseFloat(job.salaryMax) : null,
+             salaryCurrency: job.currency,
+             datePosted: job.postedAt,
+             applicationUrl: job.applyUrl,
+             vacancies: job.exactHeadcount,
+             descriptionHash: job.descriptionHash,
+             firstSeenAt: new Date(),
+             lastSeenAt: new Date(),
           }
         });
       }
@@ -231,11 +180,11 @@ Please return a concise 2-sentence summary of the role and any core skills.`;
 
     return NextResponse.json({
       items: finalJobs,
-      provider: providerUsed,
+      provider: 'Apify',
       page,
       pageSize: resultsPerPage,
-      totalResults: totalResults,
-      totalPages: Math.ceil(totalResults / resultsPerPage)
+      totalResults: normalizedJobs.length,
+      totalPages: Math.ceil(normalizedJobs.length / resultsPerPage)
     });
 
   } catch (error: any) {

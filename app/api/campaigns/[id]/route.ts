@@ -30,6 +30,37 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
     }
 
+    if (updateData.status === 'Active') {
+      const { checkCampaignReadyToStart } = await import('@/lib/campaign-ready');
+      const readyCheck = await checkCampaignReadyToStart(id, user.id);
+      
+      if (!readyCheck.ready) {
+        return NextResponse.json({
+          success: false,
+          error: "Campaign is not ready to start.",
+          missingRequirements: readyCheck.missingRequirements
+        }, { status: 400 });
+      }
+
+      // Find sequences to schedule (Approved, Step 1, not unsubscribed)
+      const sequencesToSchedule = await prisma.emailSequence.findMany({
+        where: {
+          campaignId: id,
+          sequenceStep: 1,
+          approvalStatus: 'Approved',
+          status: 'Draft',
+          lead: { status: { not: "Unsubscribed" } }
+        }
+      });
+
+      if (sequencesToSchedule.length > 0) {
+        await prisma.emailSequence.updateMany({
+          where: { id: { in: sequencesToSchedule.map(s => s.id) } },
+          data: { status: 'Scheduled' }
+        });
+      }
+    }
+
     const campaign = await prisma.campaign.update({
       where: { 
         id: id,

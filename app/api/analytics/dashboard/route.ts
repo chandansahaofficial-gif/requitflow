@@ -95,6 +95,6 @@ export async function GET() {
 
   } catch (error: any) {
     console.error("Analytics Error:", error);
-    return NextResponse.json({ error: "Failed to load analytics data" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load analytics data", details: error.message || error.toString() }, { status: 500 });
   }
 }
