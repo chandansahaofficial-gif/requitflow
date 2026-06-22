@@ -13,10 +13,32 @@ export default function LeadDatabasePage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  // New states for campaigns
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
+  const [addingToCampaign, setAddingToCampaign] = useState(false);
+
+  // Manual lead creation
+  const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
+  const [creatingLead, setCreatingLead] = useState(false);
+  const [newLeadData, setNewLeadData] = useState({
+    businessName: '',
+    email: '',
+    phone: '',
+    website: '',
+    category: '',
+    country: ''
+  });
+
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/leads");
+      if (res.status === 401) {
+        window.location.href = '/login';
+        return;
+      }
       const data = await res.json();
       if (data.leads) {
         setLeads(data.leads.map((l: any) => ({
@@ -41,6 +63,20 @@ export default function LeadDatabasePage() {
   }, []);
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
+
+  const fetchCampaigns = async () => {
+    try {
+      const res = await fetch('/api/campaigns');
+      if (res.ok) {
+        const data = await res.json();
+        setCampaigns(data.campaigns || []);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
 
   // Filter leads
   useEffect(() => {
@@ -128,6 +164,80 @@ export default function LeadDatabasePage() {
     URL.revokeObjectURL(url);
   };
 
+  // Add to Campaign
+  const handleOpenCampaignModal = () => {
+    if (selectedIds.size === 0) {
+      alert('Please select at least one lead to add to a campaign.');
+      return;
+    }
+    setIsCampaignModalOpen(true);
+  };
+
+  const handleAddToCampaign = async () => {
+    if (!selectedCampaignId) return alert('Please select a campaign.');
+    setAddingToCampaign(true);
+    try {
+      const res = await fetch('/api/campaigns/add-leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: selectedCampaignId,
+          leadIds: Array.from(selectedIds)
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Successfully added ${data.addedCount} leads to campaign. (Skipped ${data.skippedCount} duplicates)`);
+        setIsCampaignModalOpen(false);
+        setSelectedIds(new Set());
+        fetchLeads(); // refresh statuses
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to add to campaign');
+      }
+    } catch (e) {
+      alert('An unexpected error occurred.');
+    } finally {
+      setAddingToCampaign(false);
+    }
+  };
+
+  const handleCreateLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLeadData.businessName) return alert('Business Name is required.');
+    setCreatingLead(true);
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newLeadData,
+          source: 'Manual',
+          status: 'New'
+        })
+      });
+      
+      if (res.status === 401) {
+        alert('Your session has expired. Please log in again.');
+        window.location.href = '/login';
+        return;
+      }
+
+      if (res.ok) {
+        setIsAddLeadModalOpen(false);
+        setNewLeadData({ businessName: '', email: '', phone: '', website: '', category: '', country: '' });
+        fetchLeads(); // refresh the list
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to add lead');
+      }
+    } catch (error) {
+      alert('An unexpected error occurred.');
+    } finally {
+      setCreatingLead(false);
+    }
+  };
+
   const allSelected = filtered.length > 0 && selectedIds.size === filtered.length;
   const someSelected = selectedIds.size > 0;
 
@@ -141,13 +251,22 @@ export default function LeadDatabasePage() {
         </div>
         <div className="flex space-x-3">
           <button
+            onClick={() => setIsAddLeadModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors shadow-lg shadow-purple-500/25"
+          >
+            <Plus size={16} />
+            <span>Add Lead</span>
+          </button>
+          <button
             onClick={handleExport}
             className="flex items-center space-x-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors"
           >
             <Download size={16} />
             <span>Export CSV</span>
           </button>
-          <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg shadow-blue-500/25">
+          <button 
+            onClick={handleOpenCampaignModal}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg shadow-blue-500/25">
             <Plus size={16} />
             <span>Add to Campaign</span>
           </button>
@@ -159,6 +278,12 @@ export default function LeadDatabasePage() {
         <div className="sticky top-4 z-30 bg-purple-900/40 border border-purple-500/50 rounded-lg px-4 py-3 flex justify-between items-center shadow-2xl backdrop-blur-md">
           <span className="text-sm text-white font-bold">{selectedIds.size} {selectedIds.size === 1 ? 'lead' : 'leads'} selected</span>
           <div className="flex gap-2">
+            <button
+              onClick={handleOpenCampaignModal}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-md border border-blue-500 flex items-center gap-1 font-medium transition-colors"
+            >
+              <Plus size={13} /> Add to Campaign
+            </button>
             <button
               onClick={handleExport}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs rounded-md border border-slate-700 flex items-center gap-1"
@@ -374,6 +499,158 @@ export default function LeadDatabasePage() {
           </div>
         )}
       </div>
+
+      {/* Add to Campaign Modal */}
+      {isCampaignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Plus size={18} className="text-blue-400" />
+                Add Leads to Campaign
+              </h3>
+              <button onClick={() => setIsCampaignModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-slate-300 text-sm">
+                You are adding <span className="font-bold text-white">{selectedIds.size}</span> selected {selectedIds.size === 1 ? 'lead' : 'leads'} to a campaign.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">Select Campaign</label>
+                <select
+                  value={selectedCampaignId}
+                  onChange={(e) => setSelectedCampaignId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                >
+                  <option value="">-- Choose a Campaign --</option>
+                  {campaigns.filter(c => c.status !== 'Completed' && c.status !== 'Archived' && c.status !== 'Deleted').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-800 flex justify-end gap-3 bg-slate-800/20">
+              <button
+                onClick={() => setIsCampaignModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddToCampaign}
+                disabled={!selectedCampaignId || addingToCampaign}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+              >
+                {addingToCampaign && <Loader2 size={14} className="animate-spin" />}
+                Add to Campaign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Lead Modal */}
+      {isAddLeadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Plus size={18} className="text-purple-400" />
+                Add Lead Manually
+              </h3>
+              <button onClick={() => setIsAddLeadModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateLead}>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Business Name <span className="text-red-500">*</span></label>
+                    <input 
+                      required
+                      type="text" 
+                      value={newLeadData.businessName} 
+                      onChange={e => setNewLeadData({...newLeadData, businessName: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors" 
+                      placeholder="e.g. Acme Corp" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Email</label>
+                    <input 
+                      type="email" 
+                      value={newLeadData.email} 
+                      onChange={e => setNewLeadData({...newLeadData, email: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors" 
+                      placeholder="e.g. contact@acme.com" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Phone</label>
+                    <input 
+                      type="tel" 
+                      value={newLeadData.phone} 
+                      onChange={e => setNewLeadData({...newLeadData, phone: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors" 
+                      placeholder="e.g. +1 234 567 8900" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Website</label>
+                    <input 
+                      type="url" 
+                      value={newLeadData.website} 
+                      onChange={e => setNewLeadData({...newLeadData, website: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors" 
+                      placeholder="e.g. https://acme.com" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Category</label>
+                    <input 
+                      type="text" 
+                      value={newLeadData.category} 
+                      onChange={e => setNewLeadData({...newLeadData, category: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors" 
+                      placeholder="e.g. Software, Real Estate" 
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Country</label>
+                    <input 
+                      type="text" 
+                      value={newLeadData.country} 
+                      onChange={e => setNewLeadData({...newLeadData, country: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors" 
+                      placeholder="e.g. United States" 
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 border-t border-slate-800 flex justify-end gap-3 bg-slate-800/20">
+                <button
+                  type="button"
+                  onClick={() => setIsAddLeadModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingLead || !newLeadData.businessName}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                >
+                  {creatingLead && <Loader2 size={14} className="animate-spin" />}
+                  Save Lead
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,20 +2,67 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const { id } = await params;
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id, userId: user.id },
+      include: {
+        campaignLeads: {
+          include: {
+            lead: {
+              select: { id: true, businessName: true, email: true, status: true }
+            }
+          }
+        },
+        _count: {
+          select: {
+            leads: true,
+            emailSequences: true,
+            campaignLeads: true,
+            replies: true,
+            bookedCalls: true
+          }
+        }
+      }
+    });
+
+    if (!campaign) {
+      return NextResponse.json({ error: 'Campaign not found.' }, { status: 404 });
+    }
+
+    const [totalDrafts, pendingReview, approvedEmail1] = await Promise.all([
+      prisma.emailSequence.count({ where: { campaignId: id } }),
+      prisma.emailSequence.count({ where: { campaignId: id, approvalStatus: 'Pending' } }),
+      prisma.emailSequence.count({ where: { campaignId: id, sequenceStep: 1, approvalStatus: 'Approved' } }),
+    ]);
+
+    return NextResponse.json({ campaign: { ...campaign, totalDrafts, pendingReview, approvedEmail1 } });
+  } catch (error: any) {
+    console.error('Fetch campaign error:', error);
+    return NextResponse.json({ error: 'Something went wrong while loading this campaign. Please try again.' }, { status: 500 });
+  }
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const data = await req.json();
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
 
     const updateData: any = {};
     const editableFields = [
-      'name', 'campaignType', 'targetAudience', 'industry', 'offer', 
-      'goal', 'tone', 'language', 'ctaType', 'ctaLink', 'senderName', 
-      'agencyName', 'emailSignature', 'status', 'sendingMode',
+      'name', 'campaignType', 'targetAudience', 'industry', 'offer',
+      'goal', 'tone', 'language', 'ctaType', 'ctaLink', 'bookingLink',
+      'senderName', 'agencyName', 'emailSignature', 'status', 'sendingMode',
+      'problemSolved', 'mainBenefit', 'proofCaseStudy', 'unsubscribeLine', 'senderEmail',
+      'dailyLimit', 'followUpCount',
       'timingMode', 'timezoneMode', 'allowedSendingDays', 'sendingWindowStart',
       'sendingWindowEnd', 'weekendsEnabled', 'skipHolidays', 'autoApproveEmails',
       'autoSendApprovedEmails', 'bookingAutomationMode', 'meetingType',
@@ -30,49 +77,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
     }
 
+    // Block status=Active from going through PATCH — use /start endpoint instead
     if (updateData.status === 'Active') {
-      const { checkCampaignReadyToStart } = await import('@/lib/campaign-ready');
-      const readyCheck = await checkCampaignReadyToStart(id, user.id);
-      
-      if (!readyCheck.ready) {
-        return NextResponse.json({
-          success: false,
-          error: "Campaign is not ready to start.",
-          missingRequirements: readyCheck.missingRequirements
-        }, { status: 400 });
-      }
-
-      // Find sequences to schedule (Approved, Step 1, not unsubscribed)
-      const sequencesToSchedule = await prisma.emailSequence.findMany({
-        where: {
-          campaignId: id,
-          sequenceStep: 1,
-          approvalStatus: 'Approved',
-          status: 'Draft',
-          lead: { status: { not: "Unsubscribed" } }
-        }
-      });
-
-      if (sequencesToSchedule.length > 0) {
-        await prisma.emailSequence.updateMany({
-          where: { id: { in: sequencesToSchedule.map(s => s.id) } },
-          data: { status: 'Scheduled' }
-        });
-      }
+      return NextResponse.json({
+        error: 'Use the /start endpoint to start a campaign.',
+      }, { status: 400 });
     }
 
     const campaign = await prisma.campaign.update({
-      where: { 
-        id: id,
-        userId: user.id
-      },
+      where: { id, userId: user.id },
       data: updateData
     });
 
     return NextResponse.json({ campaign });
   } catch (error: any) {
-    console.error("Update campaign error:", error);
-    return NextResponse.json({ error: "Failed to update campaign" }, { status: 500 });
+    console.error('Update campaign error:', error);
+    return NextResponse.json({ error: 'Something went wrong while saving your campaign. Please try again.' }, { status: 500 });
   }
 }
 
@@ -81,11 +101,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
 
     const campaign = await prisma.campaign.findUnique({
-      where: { id: id, userId: user.id },
+      where: { id, userId: user.id },
       include: {
         _count: {
           select: { emailSequences: { where: { status: 'Sent' } } }
@@ -94,26 +113,23 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     });
 
     if (!campaign) {
-      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+      return NextResponse.json({ error: 'Campaign not found.' }, { status: 404 });
     }
 
     if (campaign._count.emailSequences > 0) {
-      // Soft delete / archive
+      // Soft delete / archive if emails were sent
       await prisma.campaign.update({
-        where: { id: id },
+        where: { id },
         data: { status: 'Archived' }
       });
       return NextResponse.json({ success: true, archived: true });
     } else {
-      // Hard delete
-      await prisma.campaign.delete({
-        where: { id: id }
-      });
+      await prisma.campaign.delete({ where: { id } });
       return NextResponse.json({ success: true, deleted: true });
     }
 
   } catch (error: any) {
-    console.error("Delete campaign error:", error);
-    return NextResponse.json({ error: "Failed to delete campaign" }, { status: 500 });
+    console.error('Delete campaign error:', error);
+    return NextResponse.json({ error: 'Something went wrong while deleting this campaign. Please try again.' }, { status: 500 });
   }
 }

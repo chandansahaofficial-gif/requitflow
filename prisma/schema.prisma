@@ -146,6 +146,12 @@ model Campaign {
   status             String   @default("Draft") // Draft, Active, Paused, Completed, Stopped
   bookingLink        String?
   
+  problemSolved      String?
+  mainBenefit        String?
+  proofCaseStudy     String?
+  unsubscribeLine    String?
+  senderEmail        String?
+  
   // 7-step sequence & AI timing settings
   followUpCount               Int      @default(7)
   timingMode                  String   @default("AI Recommended")
@@ -222,6 +228,16 @@ model EmailSequence {
   
   status              String   @default("Draft") // Draft, Scheduled, Sent, Failed
   approvalStatus      String   @default("Pending") // Pending, Approved, Rejected
+  
+  emailType           String?
+  purpose             String?
+  extraInstruction    String?
+  enabled             Boolean  @default(true)
+  
+  personalizationLevel String?
+  emailLength         String?
+  spamSafety          String?
+  ctaStyle            String?
   
   aiOriginalSubject   String?
   aiOriginalBody      String?

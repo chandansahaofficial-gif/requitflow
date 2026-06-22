@@ -75,14 +75,35 @@ export function recommendNextSendTime(
   };
 }
 
+/**
+ * PRD §4 default 5-step sequence delays.
+ * Email 1: Day 0 (Intro)
+ * Email 2: Day 2 (Follow-up)
+ * Email 3: Day 5 (Problem-based)
+ * Email 4: Day 8 (Benefit/proof)
+ * Email 5: Day 12 (Final follow-up)
+ */
 export function getDefaultSequenceDelays() {
   return [
-    { step: 1, delay: 0, unit: 'business_days' },  // Day 0
-    { step: 2, delay: 2, unit: 'business_days' },  // Day 2
-    { step: 3, delay: 3, unit: 'business_days' },  // Day 5 (2+3)
-    { step: 4, delay: 4, unit: 'business_days' },  // Day 9 (5+4)
-    { step: 5, delay: 5, unit: 'business_days' },  // Day 14
-    { step: 6, delay: 5, unit: 'business_days' },  // Day 19
-    { step: 7, delay: 7, unit: 'business_days' },  // Day 26
+    { step: 1, delay: 0,  unit: 'business_days', name: 'Intro',              purpose: 'Personalized introduction with soft CTA.' },
+    { step: 2, delay: 2,  unit: 'business_days', name: 'Follow-up',          purpose: 'Follow up and ask one simple question.' },
+    { step: 3, delay: 3,  unit: 'business_days', name: 'Problem-based',      purpose: 'Address the main problem you solve.' },
+    { step: 4, delay: 3,  unit: 'business_days', name: 'Benefit / Proof',    purpose: 'Highlight key benefit or case study if available.' },
+    { step: 5, delay: 4,  unit: 'business_days', name: 'Final Follow-up',    purpose: 'Respectful last follow-up with easy opt-out.' },
+  ];
+}
+
+/**
+ * Legacy 7-step sequence delays — kept for backward compatibility.
+ */
+export function getSevenStepSequenceDelays() {
+  return [
+    { step: 1, delay: 0, unit: 'business_days' },
+    { step: 2, delay: 2, unit: 'business_days' },
+    { step: 3, delay: 3, unit: 'business_days' },
+    { step: 4, delay: 4, unit: 'business_days' },
+    { step: 5, delay: 5, unit: 'business_days' },
+    { step: 6, delay: 5, unit: 'business_days' },
+    { step: 7, delay: 7, unit: 'business_days' },
   ];
 }

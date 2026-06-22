@@ -7,13 +7,18 @@ export default function CampaignDetailPage() {
   const params = useParams();
   const campaignId = params.id as string;
   
-  const [activeTab, setActiveTab] = useState("Seven-Step Sequence");
+  const [activeTab, setActiveTab] = useState("5-Step Sequence");
   const [loading, setLoading] = useState(true);
   const [campaignLeads, setCampaignLeads] = useState<any[]>([]);
   const [campaignData, setCampaignData] = useState<any>(null);
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState("");
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
+  
+  // Leads Tab State
+  const [leadSearch, setLeadSearch] = useState("");
+  const [leadFilter, setLeadFilter] = useState("All");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
 
   const fetchCampaignData = async () => {
     setLoading(true);
@@ -36,10 +41,10 @@ export default function CampaignDetailPage() {
   }, [campaignId]);
 
   const handleGenerateSequences = async () => {
-    const leadsWithoutEmails = campaignLeads.filter(cl => !cl.lead.emailSequences || cl.lead.emailSequences.length < 7).map(cl => cl.leadId);
+    const leadsWithoutEmails = campaignLeads.filter(cl => !cl.lead.emailSequences || cl.lead.emailSequences.length < 5).map(cl => cl.leadId);
     
     if (leadsWithoutEmails.length === 0) {
-      return alert("All leads already have 7-step email sequences.");
+      return alert("All leads already have 5-Step email sequences.");
     }
 
     setGenerating(true);
@@ -47,7 +52,7 @@ export default function CampaignDetailPage() {
     const batchSize = 10;
     for (let i = 0; i < leadsWithoutEmails.length; i += batchSize) {
       const batch = leadsWithoutEmails.slice(i, i + batchSize);
-      setGenProgress(`Generating 7-step sequences for leads ${i + 1} to ${Math.min(i + batchSize, leadsWithoutEmails.length)} of ${leadsWithoutEmails.length}...`);
+      setGenProgress(`Generating 5-Step sequences for leads ${i + 1} to ${Math.min(i + batchSize, leadsWithoutEmails.length)} of ${leadsWithoutEmails.length}...`);
       
       try {
         const res = await fetch(`/api/campaigns/${campaignId}/generate-seven-step-sequence`, {
@@ -108,14 +113,64 @@ export default function CampaignDetailPage() {
     } catch (e) { console.error(e); }
   };
 
-  const tabs = ["Overview", "Leads", "Seven-Step Sequence", "Timing", "Replies", "Analytics", "Settings"];
+  const filteredLeads = campaignLeads.filter(cl => {
+    const lead = cl.lead;
+    if (leadFilter === "Valid Email") {
+      if (!lead.email || !lead.email.includes('@')) return false;
+    } else if (leadFilter === "Invalid Email") {
+      if (lead.email && lead.email.includes('@')) return false;
+    } else if (leadFilter === "Unsubscribed") {
+      if (lead.status !== "Unsubscribed") return false;
+    }
+    
+    if (leadSearch) {
+      const term = leadSearch.toLowerCase();
+      return (lead.businessName?.toLowerCase().includes(term) || lead.email?.toLowerCase().includes(term) || lead.name?.toLowerCase().includes(term));
+    }
+    return true;
+  });
+
+  const toggleSelectAllLeads = (onlyValid = false) => {
+    let toSelect = filteredLeads;
+    if (onlyValid) {
+       toSelect = filteredLeads.filter(cl => cl.lead.email && cl.lead.email.includes('@') && cl.lead.status !== 'Unsubscribed');
+    }
+    
+    if (selectedLeadIds.length === toSelect.length && toSelect.length > 0) {
+      setSelectedLeadIds([]);
+    } else {
+      setSelectedLeadIds(toSelect.map(cl => cl.leadId));
+    }
+  };
+
+  const toggleSelectLead = (id: string) => {
+    setSelectedLeadIds(prev => prev.includes(id) ? prev.filter(lId => lId !== id) : [...prev, id]);
+  };
+  
+  const handleRemoveSelectedLeads = async () => {
+    if (selectedLeadIds.length === 0) return;
+    if (!confirm(`Are you sure you want to remove ${selectedLeadIds.length} leads from this campaign?`)) return;
+    
+    try {
+      // Assuming endpoint exists for removal
+      await fetch(`/api/campaigns/${campaignId}/leads`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: selectedLeadIds })
+      });
+      setSelectedLeadIds([]);
+      fetchCampaignData();
+    } catch(e) { console.error(e); }
+  };
+
+  const tabs = ["Overview", "Leads", "5-Step Sequence", "Timing", "Replies", "Analytics", "Settings"];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-bold text-white mb-2">Campaign Details</h2>
-          <p className="text-slate-400">Review leads, manage AI 7-step sequences, and track performance.</p>
+          <p className="text-slate-400">Review leads, manage AI 5-Step sequences, and track performance.</p>
         </div>
       </div>
 
@@ -135,23 +190,32 @@ export default function CampaignDetailPage() {
         <div className="flex justify-center py-20">
           <Loader2 className="animate-spin text-purple-500" size={40} />
         </div>
-      ) : activeTab === "Seven-Step Sequence" ? (
+      ) : activeTab === "5-Step Sequence" ? (
         <div className="space-y-6">
           <div className="flex justify-between items-center bg-slate-900/50 p-6 rounded-2xl border border-slate-700/50">
             <div>
               <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                <Mail className="text-purple-400" size={20} /> Seven-Step AI Sequences
+                <Mail className="text-purple-400" size={20} /> 5-Step AI Sequences
               </h3>
-              <p className="text-sm text-slate-400">AI generates a full 7-step sequence leveraging your Knowledge Base.</p>
+              <p className="text-sm text-slate-400">AI generates a full 5-Step sequence leveraging your Knowledge Base.</p>
+              <p className="text-xs text-purple-400 mt-2 font-medium bg-purple-500/10 inline-block px-2 py-1 rounded">
+                Drafts Estimate: {campaignLeads.length} leads × 5 emails = {campaignLeads.length * 5} total drafts
+              </p>
             </div>
             <div className="flex space-x-3 items-center">
+              <button 
+                onClick={() => alert("Coming soon")} 
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700 text-sm"
+              >
+                View Default Sequence
+              </button>
               <button 
                 onClick={handleGenerateSequences} 
                 disabled={generating}
                 className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors shadow-lg shadow-purple-500/25 flex items-center space-x-2 disabled:opacity-50"
               >
                 {generating ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
-                <span>{generating ? "Generating Sequences..." : "Generate Missing 7-Step Sequences"}</span>
+                <span>{generating ? "Generating Sequences..." : "Generate Missing 5-Step Sequences"}</span>
               </button>
             </div>
           </div>
@@ -195,7 +259,7 @@ export default function CampaignDetailPage() {
                       </div>
                       <div className="flex items-center space-x-4">
                         {!hasEmails ? (
-                          <span className="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-400">0 / 7 Steps</span>
+                          <span className="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-400">0 / 5 Steps</span>
                         ) : (
                           <span className="text-xs px-2.5 py-1 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
                             {emails.filter((e: any) => e.approvalStatus === 'Approved').length} / {emails.length} Approved
@@ -211,8 +275,8 @@ export default function CampaignDetailPage() {
                       <div className="p-6 border-t border-slate-800 bg-slate-900/30">
                         {!hasEmails ? (
                           <div className="text-center py-10">
-                            <h3 className="text-lg text-white mb-2">No 7-step sequence generated yet.</h3>
-                            <p className="text-slate-400 text-sm">Click the "Generate Missing 7-Step Sequences" button.</p>
+                            <h3 className="text-lg text-white mb-2">No 5-Step sequence generated yet.</h3>
+                            <p className="text-slate-400 text-sm">Click the "Generate Missing 5-Step Sequences" button.</p>
                           </div>
                         ) : (
                           <div className="space-y-8">
@@ -299,6 +363,77 @@ export default function CampaignDetailPage() {
                </div>
             </div>
          </div>
+      ) : activeTab === "Leads" ? (
+        <div className="space-y-6 animate-in fade-in">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 w-full md:w-80">
+              <input type="text" value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Search leads by name, email..." className="bg-transparent border-none outline-none w-full text-sm text-white placeholder-slate-500" />
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-slate-400">Filters:</span>
+              {["All", "Valid Email", "Invalid Email", "Unsubscribed"].map(filter => (
+                <button key={filter} onClick={() => setLeadFilter(filter)} className={`px-3 py-1.5 rounded-full text-xs font-medium border ${leadFilter === filter ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>
+                  {filter}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+             <div className="flex items-center gap-3">
+               <input type="checkbox" checked={selectedLeadIds.length === filteredLeads.length && filteredLeads.length > 0} onChange={() => toggleSelectAllLeads()} className="w-4 h-4 rounded border-slate-600 bg-slate-900 focus:ring-purple-500 cursor-pointer" />
+               <span className="text-sm text-slate-300">{selectedLeadIds.length} leads selected</span>
+             </div>
+             <div className="flex gap-2">
+               <button onClick={() => toggleSelectAllLeads(true)} className="px-3 py-1.5 bg-blue-500/10 text-blue-400 text-xs font-medium rounded hover:bg-blue-500/20 border border-blue-500/20">Select All Valid Leads</button>
+               <button onClick={() => setSelectedLeadIds([])} disabled={selectedLeadIds.length === 0} className="px-3 py-1.5 bg-slate-700 text-slate-300 text-xs font-medium rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">Clear Selection</button>
+               <button onClick={handleRemoveSelectedLeads} disabled={selectedLeadIds.length === 0} className="px-3 py-1.5 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-red-500/20">Exclude Selected</button>
+               <button onClick={() => window.location.href = '/dashboard/generate-leads'} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded transition-colors shadow-lg shadow-purple-500/20">Generate More Leads</button>
+             </div>
+          </div>
+
+          <div className="glass rounded-2xl border border-slate-700/50 overflow-hidden">
+             {filteredLeads.length === 0 ? (
+               <div className="p-12 text-center flex flex-col items-center justify-center">
+                 <Users size={48} className="text-slate-600 mb-4" />
+                 <h3 className="text-lg font-bold text-white mb-2">No leads found</h3>
+                 <p className="text-slate-400 mb-6">There are no leads matching your filters in this campaign.</p>
+                 <button onClick={() => window.location.href = '/dashboard/generate-leads'} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors">Generate Leads First</button>
+               </div>
+             ) : (
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left text-sm text-slate-300">
+                   <thead className="bg-slate-900/50 text-slate-400 border-b border-slate-800">
+                     <tr>
+                       <th className="px-4 py-4 w-12 text-center">
+                         <input type="checkbox" checked={selectedLeadIds.length === filteredLeads.length && filteredLeads.length > 0} onChange={() => toggleSelectAllLeads()} className="w-4 h-4 rounded border-slate-600 bg-slate-900 focus:ring-purple-500 cursor-pointer" />
+                       </th>
+                       <th className="px-6 py-4 font-medium">Name / Business</th>
+                       <th className="px-6 py-4 font-medium">Email</th>
+                       <th className="px-6 py-4 font-medium">Status</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-800">
+                     {filteredLeads.map(cl => (
+                       <tr key={cl.lead.id} className="hover:bg-slate-800/30 transition-colors">
+                         <td className="px-4 py-4 text-center">
+                           <input type="checkbox" checked={selectedLeadIds.includes(cl.lead.id)} onChange={() => toggleSelectLead(cl.lead.id)} className="w-4 h-4 rounded border-slate-600 bg-slate-900 focus:ring-purple-500 cursor-pointer" />
+                         </td>
+                         <td className="px-6 py-4 font-medium text-white">{cl.lead.businessName || cl.lead.name}</td>
+                         <td className="px-6 py-4 text-slate-400">{cl.lead.email || <span className="text-red-400 italic">No email</span>}</td>
+                         <td className="px-6 py-4">
+                           <span className={`px-2 py-1 rounded text-xs ${cl.lead.status === 'Unsubscribed' ? 'bg-red-500/20 text-red-400' : 'bg-slate-800 text-slate-300'}`}>
+                             {cl.lead.status || 'Added'}
+                           </span>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+             )}
+          </div>
+        </div>
       ) : (
         <div className="glass p-12 rounded-2xl border border-slate-700/50 text-center min-h-[50vh] flex items-center justify-center">
           <p className="text-slate-400 text-lg">{activeTab} tab is under construction.</p>
@@ -313,6 +448,11 @@ function EmailEditorBlock({ email, onSave, onApprove, onRegenerate }: { email: a
   const [body, setBody] = useState(email.body || '');
   const [delayAmount, setDelayAmount] = useState(email.delayAmount || 0);
   const [delayUnit, setDelayUnit] = useState(email.delayUnit || 'business_days');
+  
+  const [emailType, setEmailType] = useState(email.emailType || 'Standard');
+  const [purpose, setPurpose] = useState(email.purpose || 'Follow-up');
+  const [extraInstruction, setExtraInstruction] = useState(email.extraInstruction || '');
+  const [enabled, setEnabled] = useState(email.enabled !== false);
 
   const isApproved = email.approvalStatus === "Approved";
   
@@ -322,6 +462,7 @@ function EmailEditorBlock({ email, onSave, onApprove, onRegenerate }: { email: a
     <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg">
       <div className="bg-slate-800/80 px-4 py-3 flex justify-between items-center border-b border-slate-700">
         <div className="flex items-center space-x-3">
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="w-4 h-4 rounded border-slate-600 bg-slate-900 focus:ring-purple-500 cursor-pointer" title="Enable/Disable Step" />
           <span className="w-6 h-6 rounded bg-purple-600 text-white flex items-center justify-center text-xs font-bold">{email.sequenceStep}</span>
           <span className="text-white font-medium">{email.name || `Step ${email.sequenceStep}`}</span>
           
@@ -372,11 +513,31 @@ function EmailEditorBlock({ email, onSave, onApprove, onRegenerate }: { email: a
           </div>
         )}
         
-        {kbSources.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <BookOpen size={12} /> Knowledge Base Applied: {kbSources.join(', ')}
+        {email.spamRisk && (
+          <div className={`text-xs px-2 py-1 rounded inline-block ${email.spamRisk === 'High' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+            Spam Risk: {email.spamRisk}
           </div>
         )}
+        {email.personalizationScore && (
+          <div className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded inline-block ml-2">
+            Personalization Score: {email.personalizationScore}/100
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 mt-2 mb-2">
+           <div className="space-y-1">
+             <label className="text-xs font-medium text-slate-400">Email Type</label>
+             <input type="text" value={emailType} onChange={e => setEmailType(e.target.value)} disabled={isApproved} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white text-xs focus:border-purple-500 outline-none disabled:opacity-50" />
+           </div>
+           <div className="space-y-1">
+             <label className="text-xs font-medium text-slate-400">Purpose</label>
+             <input type="text" value={purpose} onChange={e => setPurpose(e.target.value)} disabled={isApproved} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white text-xs focus:border-purple-500 outline-none disabled:opacity-50" />
+           </div>
+           <div className="space-y-1 col-span-2">
+             <label className="text-xs font-medium text-slate-400">Extra AI Instruction (for regeneration)</label>
+             <input type="text" value={extraInstruction} onChange={e => setExtraInstruction(e.target.value)} disabled={isApproved} placeholder="e.g. Make it funnier, mention their recent post" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white text-xs focus:border-purple-500 outline-none disabled:opacity-50" />
+           </div>
+        </div>
 
         <div className="space-y-1">
           <label className="text-xs font-medium text-slate-400">Subject</label>

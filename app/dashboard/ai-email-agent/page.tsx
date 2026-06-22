@@ -1,389 +1,898 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Search, Mail, Sparkles, Check, X, RefreshCw, Loader2, Plus, Play, Pause, Trash2, Edit2, Target, Eye, FileText, Filter } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Search, Mail, Sparkles, Check, X, RefreshCw, Loader2, Plus, Play,
+  Pause, Trash2, Edit2, Target, Eye, FileText, Filter, ChevronRight,
+  ChevronLeft, AlertTriangle, Users, Zap, ArrowRight, Clock, BarChart2,
+  CheckCircle2, XCircle, AlertCircle, Info, Send, BookOpen, Settings2,
+  Shield, MessageSquare
+} from "lucide-react";
 import Link from "next/link";
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+type Campaign = {
+  id: string; name: string; status: string; campaignType?: string;
+  targetAudience?: string; offer?: string; senderEmail?: string;
+  bookingLink?: string; unsubscribeLine?: string; goal?: string;
+  tone?: string; language?: string; ctaType?: string; ctaLink?: string;
+  problemSolved?: string; mainBenefit?: string; proofCaseStudy?: string;
+  personalizationLevel?: string; emailLength?: string; spamSafety?: string;
+  ctaStyle?: string; dailyLimit?: number; followUpCount?: number;
+  createdAt?: string;
+  _count?: { leads: number; emailSequences: number; replies: number; bookedCalls: number; campaignLeads: number };
+  totalDrafts?: number; pendingReview?: number; approvedEmail1?: number;
+};
+
+type EmailDraft = {
+  id: string; subject: string; body: string; previewText?: string;
+  sequenceStep: number; approvalStatus: string; status: string;
+  spamRisk?: string; personalizationScore?: number; aiGenerationReason?: string;
+  editedSubject?: string; editedBody?: string; aiOriginalSubject?: string;
+  aiOriginalBody?: string; emailType?: string; purpose?: string;
+  campaignId: string; leadId: string;
+  campaign?: { id: string; name: string };
+  lead?: { id: string; businessName: string; email?: string; category?: string; location?: string };
+};
+
+type Lead = {
+  id: string; businessName: string; email?: string; status: string;
+  category?: string; location?: string;
+};
+
+type ReadinessItem = { key: string; label: string; passed: boolean; actionHint: string };
+
+// ─── Default wizard state ────────────────────────────────────────────────────
+const defaultWizard = {
+  // Step 1
+  name: "", campaignType: "Client Outreach", language: "English",
+  tone: "Professional", senderEmail: "", goal: "",
+  // Step 3
+  targetAudience: "", offer: "", problemSolved: "", mainBenefit: "",
+  proofCaseStudy: "", ctaType: "Book Discovery Call", bookingLink: "",
+  unsubscribeLine: "To unsubscribe, reply with STOP.",
+  // Step 4 — sequence
+  followUpCount: 5,
+  sequenceSteps: [
+    { step: 1, name: "Intro", delayDays: 0, emailType: "Introduction", purpose: "Personalized intro with soft CTA", enabled: true, extraInstruction: "" },
+    { step: 2, name: "Follow-up", delayDays: 2, emailType: "Follow-up", purpose: "Follow up, ask one question", enabled: true, extraInstruction: "" },
+    { step: 3, name: "Problem-based", delayDays: 5, emailType: "Problem", purpose: "Address the core problem", enabled: true, extraInstruction: "" },
+    { step: 4, name: "Benefit / Proof", delayDays: 8, emailType: "Benefit", purpose: "Highlight key benefit or case study", enabled: true, extraInstruction: "" },
+    { step: 5, name: "Final Follow-up", delayDays: 12, emailType: "Final", purpose: "Respectful last follow-up with opt-out", enabled: true, extraInstruction: "" },
+  ],
+  // Step 5
+  personalizationLevel: "Medium", emailLength: "Short",
+  spamSafety: "High", ctaStyle: "Soft",
+  dailyLimit: 50,
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function getNextAction(camp: Campaign): { label: string; action: string } {
+  const leads = camp._count?.campaignLeads ?? camp._count?.leads ?? 0;
+  if (leads === 0) return { label: "Add leads", action: "addLeads" };
+  if ((camp.totalDrafts ?? 0) === 0) return { label: "Generate AI emails", action: "generate" };
+  if ((camp.pendingReview ?? 0) > 0) return { label: "Review & approve Email 1", action: "review" };
+  if (!camp.bookingLink && !camp.ctaLink) return { label: "Add booking link", action: "edit" };
+  if (!camp.senderEmail) return { label: "Connect sender email", action: "settings" };
+  if (!camp.unsubscribeLine) return { label: "Add unsubscribe line", action: "edit" };
+  if (camp.status === "Active") return { label: "Monitor replies", action: "replies" };
+  if (camp.status === "Paused") return { label: "Resume campaign", action: "resume" };
+  return { label: "Start campaign", action: "start" };
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    Draft: "bg-slate-700/50 text-slate-300 border-slate-600",
+    "Generating Emails": "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    "Pending Review": "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    "Ready to Start": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    Active: "bg-green-500/10 text-green-400 border-green-500/20",
+    Paused: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    Completed: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    Archived: "bg-slate-700/50 text-slate-400 border-slate-600",
+  };
+  const cls = map[status] || "bg-slate-700/50 text-slate-300 border-slate-600";
+  return <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${cls}`}>{status}</span>;
+}
+
+function ApprovalBadge({ status, spamRisk }: { status: string; spamRisk?: string }) {
+  if (spamRisk === "High") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">⚠ High Spam</span>;
+  if (status === "Approved") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">✓ Approved</span>;
+  if (status === "Rejected") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">✗ Rejected</span>;
+  return <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">Pending</span>;
+}
+
+function InputField({ label, helper, required, children }: { label: string; helper?: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-300 mb-1">
+        {label} {required && <span className="text-red-400">*</span>}
+      </label>
+      {children}
+      {helper && <p className="mt-1 text-xs text-slate-500">{helper}</p>}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function AIEmailAgentPage() {
   const [activeTab, setActiveTab] = useState<"hub" | "pending">("hub");
 
-  // Campaign Hub State
-  const [campaigns, setCampaigns] = useState<any[]>([]);
+  // — Campaign Hub state
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [fetchingCampaigns, setFetchingCampaigns] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [campaignSearch, setCampaignSearch] = useState("");
   const [campaignFilter, setCampaignFilter] = useState("All");
 
-  const defaultCampaign = {
-    name: "", campaignType: "Client Outreach", targetAudience: "", industry: "",
-    offer: "", goal: "", tone: "Professional", language: "English", ctaType: "Book Discovery Call",
-    ctaLink: "", senderName: "", agencyName: "", emailSignature: "", sendingMode: "Human Approval Mode"
-  };
-  const [newCampaign, setNewCampaign] = useState(defaultCampaign);
+  // — Create wizard state
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardData, setWizardData] = useState({ ...defaultWizard });
+  const [wizardCampaignId, setWizardCampaignId] = useState<string | null>(null);
+  const [wizardSaving, setWizardSaving] = useState(false);
+  const [wizardGenerating, setWizardGenerating] = useState(false);
+  const [wizardLeads, setWizardLeads] = useState<Lead[]>([]);
+  const [wizardLeadSearch, setWizardLeadSearch] = useState("");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [wizardLeadsLoading, setWizardLeadsLoading] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<{ total: number; done: number; message: string } | null>(null);
 
-  // Pending Emails State
-  const [pendingEmails, setPendingEmails] = useState<any[]>([]);
+  // — Edit campaign state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+
+  // — Delete confirm
+  const [deleteModalId, setDeleteModalId] = useState<string | null>(null);
+  const [deleteHasSent, setDeleteHasSent] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // — Generate confirm
+  const [generateModalId, setGenerateModalId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  // — Readiness modal
+  const [readinessModal, setReadinessModal] = useState<{ open: boolean; campaignId: string | null; items: ReadinessItem[] }>({
+    open: false, campaignId: null, items: []
+  });
+
+  // — Start confirm modal
+  const [startConfirmId, setStartConfirmId] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+
+  // — Pending Emails state
+  const [pendingEmails, setPendingEmails] = useState<EmailDraft[]>([]);
   const [fetchingEmails, setFetchingEmails] = useState(true);
   const [emailSearch, setEmailSearch] = useState("");
   const [emailFilter, setEmailFilter] = useState("All");
+  const [emailCampaignFilter, setEmailCampaignFilter] = useState("All");
+  const [emailStepFilter, setEmailStepFilter] = useState("All");
+  const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([]);
 
-  const fetchCampaigns = async () => {
+  // — Preview modal
+  const [previewEmail, setPreviewEmail] = useState<EmailDraft | null>(null);
+
+  // — Edit email modal
+  const [editEmailModal, setEditEmailModal] = useState<{ open: boolean; email: EmailDraft | null }>({ open: false, email: null });
+  const [editSubject, setEditSubject] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+
+  // — Regenerate modal
+  const [regenModal, setRegenModal] = useState<{ open: boolean; email: EmailDraft | null }>({ open: false, email: null });
+  const [regenerating, setRegenerating] = useState(false);
+
+  // — Bulk action confirm
+  const [bulkModal, setBulkModal] = useState<{ open: boolean; action: string; count: number } | null>(null);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
+  // ─── Data fetching ────────────────────────────────────────────────────────
+  const fetchCampaigns = useCallback(async () => {
     setFetchingCampaigns(true);
     try {
       const res = await fetch("/api/campaigns");
+      if (res.status === 401) { window.location.href = "/login"; return; }
       const data = await res.json();
       if (data.campaigns) setCampaigns(data.campaigns);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setFetchingCampaigns(false);
-    }
-  };
+    } catch (err) { console.error(err); }
+    finally { setFetchingCampaigns(false); }
+  }, []);
 
-  const fetchPendingEmails = async () => {
+  const fetchEmails = useCallback(async () => {
     setFetchingEmails(true);
     try {
-      const res = await fetch("/api/email-sequences/pending-review");
+      const params = new URLSearchParams();
+      if (emailFilter !== "All") params.set("status", emailFilter);
+      if (emailCampaignFilter !== "All") params.set("campaignId", emailCampaignFilter);
+      if (emailStepFilter !== "All") params.set("step", emailStepFilter);
+      if (emailSearch) params.set("search", emailSearch);
+      const res = await fetch(`/api/email-sequences/pending-review?${params}`);
+      if (res.status === 401) { window.location.href = "/login"; return; }
       const data = await res.json();
       if (data.pendingEmails) setPendingEmails(data.pendingEmails);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setFetchingEmails(false);
-    }
-  };
+    } catch (err) { console.error(err); }
+    finally { setFetchingEmails(false); }
+  }, [emailFilter, emailCampaignFilter, emailStepFilter, emailSearch]);
 
   useEffect(() => {
     if (activeTab === "hub") fetchCampaigns();
-    else fetchPendingEmails();
-  }, [activeTab]);
+    else fetchEmails();
+  }, [activeTab, fetchCampaigns, fetchEmails]);
 
-  const handleSaveCampaign = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCampaign.name) return;
-    setCreating(true);
+  const fetchWizardLeads = useCallback(async () => {
+    setWizardLeadsLoading(true);
     try {
-      const url = editingCampaignId ? `/api/campaigns/${editingCampaignId}` : "/api/campaigns";
-      const method = editingCampaignId ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newCampaign),
-      });
-      if (res.ok) {
-        setShowModal(false);
-        setNewCampaign(defaultCampaign);
-        setEditingCampaignId(null);
-        fetchCampaigns();
-      } else {
-        alert("Failed to save campaign.");
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setCreating(false);
-    }
+      const res = await fetch("/api/leads?limit=500");
+      const data = await res.json();
+      if (data.leads) setWizardLeads(data.leads);
+    } catch { }
+    finally { setWizardLeadsLoading(false); }
+  }, []);
+
+  // ─── Wizard ───────────────────────────────────────────────────────────────
+  const openWizard = () => {
+    setWizardData({ ...defaultWizard });
+    setWizardCampaignId(null);
+    setSelectedLeadIds([]);
+    setWizardStep(1);
+    setGenerationProgress(null);
+    setWizardOpen(true);
   };
 
-  const deleteCampaign = async (id: string, emailsSent: number) => {
-    if (emailsSent > 0) {
-      if (!confirm("This campaign has sent emails. Deleting it may remove campaign history. Are you sure?")) return;
-    } else {
-      if (!confirm("Are you sure you want to delete this campaign?")) return;
-    }
-    try {
-      const res = await fetch(`/api/campaigns/${id}`, { method: "DELETE" });
-      if (res.ok) fetchCampaigns();
-    } catch (err) {
-      console.error(err);
-    }
+  const closeWizard = () => {
+    setWizardOpen(false);
+    setWizardStep(1);
+    setWizardCampaignId(null);
+    setGenerationProgress(null);
   };
 
-  const updateStatus = async (id: string, status: string) => {
+  const handleWizardNext = async () => {
+    // Step 1 → save campaign to DB
+    if (wizardStep === 1) {
+      if (!wizardData.name.trim()) return alert("Campaign name is required.");
+      setWizardSaving(true);
+      try {
+        const method = wizardCampaignId ? "PATCH" : "POST";
+        const url = wizardCampaignId ? `/api/campaigns/${wizardCampaignId}` : "/api/campaigns";
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: wizardData.name, campaignType: wizardData.campaignType,
+            language: wizardData.language, tone: wizardData.tone,
+            senderEmail: wizardData.senderEmail, goal: wizardData.goal,
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || "Failed to save campaign."); return; }
+        setWizardCampaignId(data.campaign.id);
+      } catch { alert("An error occurred. Please try again."); return; }
+      finally { setWizardSaving(false); }
+    }
+
+    // Step 1 → Step 2: load leads
+    if (wizardStep === 1) fetchWizardLeads();
+
+    // Step 2 → add selected leads to campaign
+    if (wizardStep === 2 && wizardCampaignId && selectedLeadIds.length > 0) {
+      setWizardSaving(true);
+      try {
+        await fetch("/api/campaigns/add-leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ campaignId: wizardCampaignId, leadIds: selectedLeadIds })
+        });
+      } catch { }
+      finally { setWizardSaving(false); }
+    }
+
+    // Step 3 → save offer/CTA fields
+    if (wizardStep === 3 && wizardCampaignId) {
+      setWizardSaving(true);
+      try {
+        await fetch(`/api/campaigns/${wizardCampaignId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetAudience: wizardData.targetAudience, offer: wizardData.offer,
+            problemSolved: wizardData.problemSolved, mainBenefit: wizardData.mainBenefit,
+            proofCaseStudy: wizardData.proofCaseStudy, ctaType: wizardData.ctaType,
+            bookingLink: wizardData.bookingLink, ctaLink: wizardData.bookingLink,
+            unsubscribeLine: wizardData.unsubscribeLine,
+          })
+        });
+      } catch { }
+      finally { setWizardSaving(false); }
+    }
+
+    // Step 5 → save AI writing settings
+    if (wizardStep === 5 && wizardCampaignId) {
+      setWizardSaving(true);
+      try {
+        await fetch(`/api/campaigns/${wizardCampaignId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            personalizationLevel: wizardData.personalizationLevel,
+            emailLength: wizardData.emailLength, spamSafety: wizardData.spamSafety,
+            ctaStyle: wizardData.ctaStyle, dailyLimit: wizardData.dailyLimit,
+          })
+        });
+      } catch { }
+      finally { setWizardSaving(false); }
+    }
+
+    setWizardStep(s => s + 1);
+  };
+
+  const handleWizardGenerate = async () => {
+    if (!wizardCampaignId) return;
+    if (selectedLeadIds.length === 0) {
+      return alert("No leads selected. Go back to Step 2 and select at least one lead.");
+    }
+    setWizardGenerating(true);
+    setGenerationProgress({ total: selectedLeadIds.length, done: 0, message: "Preparing AI drafts..." });
     try {
-      const res = await fetch(`/api/campaigns/${id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/campaigns/${wizardCampaignId}/generate-email-sequence`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ leadIds: selectedLeadIds })
       });
       const data = await res.json();
       if (res.ok) {
+        setGenerationProgress({
+          total: selectedLeadIds.length,
+          done: data.successCount || selectedLeadIds.length,
+          message: data.message || `AI created ${data.totalDrafts || 0} drafts. Review and approve Email 1 before starting.`
+        });
         fetchCampaigns();
       } else {
-        if (data.missingRequirements && data.missingRequirements.length > 0) {
-          const reqs = data.missingRequirements.map((r: string) => `\n• ${r}`).join("");
-          alert(`${data.error || "Your campaign is not ready yet:"}${reqs}`);
-        } else {
-          alert(data.error || "Failed to update campaign.");
-        }
+        setGenerationProgress({ total: 0, done: 0, message: data.error || "Generation failed." });
       }
-    } catch (err) {
-      console.error(err);
-      alert("An unexpected error occurred.");
+    } catch {
+      setGenerationProgress({ total: 0, done: 0, message: "An error occurred. Please try again." });
+    } finally {
+      setWizardGenerating(false);
     }
+  };
+
+  const handleWizardDone = () => {
+    closeWizard();
+    setActiveTab("pending");
+    fetchEmails();
+  };
+
+  // ─── Campaign actions ─────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteModalId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/campaigns/${deleteModalId}`, { method: "DELETE" });
+      if (res.ok) { setDeleteModalId(null); fetchCampaigns(); }
+      else { const d = await res.json(); alert(d.error || "Failed to delete campaign."); }
+    } catch { alert("An error occurred."); }
+    finally { setDeleting(false); }
   };
 
   const handleGenerateEmails = async (id: string) => {
+    setGenerating(true);
     try {
       const res = await fetch(`/api/campaigns/${id}/generate-email-sequence`, { method: "POST" });
       const data = await res.json();
-      if (res.ok) alert(data.message || "Emails generated successfully!");
-      else alert(data.error || "Failed to generate emails.");
-    } catch (err) {
-      console.error(err);
-    }
+      if (res.ok) {
+        alert(data.message || "Emails generated successfully! Switch to Pending Email Reviews to review them.");
+        fetchCampaigns();
+      } else {
+        alert(data.error || "Failed to generate emails.");
+      }
+    } catch { alert("An error occurred."); }
+    finally { setGenerating(false); setGenerateModalId(null); }
   };
 
+  const handleStartCampaign = async (id: string) => {
+    setStarting(true);
+    try {
+      const res = await fetch(`/api/campaigns/${id}/start`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setStartConfirmId(null);
+        fetchCampaigns();
+        alert(`Campaign started! ${data.scheduledCount || 0} emails have been scheduled.`);
+      } else {
+        setStartConfirmId(null);
+        setReadinessModal({ open: true, campaignId: id, items: data.items || [] });
+      }
+    } catch { alert("An error occurred while starting the campaign."); }
+    finally { setStarting(false); }
+  };
+
+  const handlePauseCampaign = async (id: string) => {
+    try {
+      const res = await fetch(`/api/campaigns/${id}/pause`, { method: "POST" });
+      if (res.ok) fetchCampaigns();
+      else { const d = await res.json(); alert(d.error || "Failed to pause campaign."); }
+    } catch { alert("An error occurred."); }
+  };
+
+  const handleResumeCampaign = (id: string) => setStartConfirmId(id);
+
+  const handleSaveEditCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCampaign) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/campaigns/${editCampaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editCampaign)
+      });
+      if (res.ok) { setEditModalOpen(false); fetchCampaigns(); }
+      else { const d = await res.json(); alert(d.error || "Failed to save changes."); }
+    } catch { alert("An error occurred."); }
+    finally { setEditSaving(false); }
+  };
+
+  // ─── Email actions ────────────────────────────────────────────────────────
   const handleApproveEmail = async (id: string) => {
     try {
-      const res = await fetch("/api/email/send-one", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sequenceId: id })
-      });
-      if (res.ok) fetchPendingEmails();
-      else alert("Failed to send/approve email.");
-    } catch (err) {
-      console.error(err);
-    }
+      const res = await fetch(`/api/email-sequences/${id}/approve`, { method: "POST" });
+      if (res.ok) fetchEmails();
+      else { const d = await res.json(); alert(d.error || "Failed to approve email."); }
+    } catch { alert("An error occurred."); }
   };
 
+  const handleRejectEmail = async (id: string) => {
+    try {
+      const res = await fetch(`/api/email-sequences/${id}/reject`, { method: "POST" });
+      if (res.ok) fetchEmails();
+      else { const d = await res.json(); alert(d.error || "Failed to reject email."); }
+    } catch { alert("An error occurred."); }
+  };
+
+  const handleSaveEditEmail = async (approve: boolean) => {
+    if (!editEmailModal.email) return;
+    if (!editSubject.trim()) { alert("Subject cannot be empty."); return; }
+    if (!editBody.trim()) { alert("Body cannot be empty."); return; }
+    setEmailSaving(true);
+    try {
+      const res = await fetch(`/api/email-sequences/${editEmailModal.email.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: editSubject, body: editBody, approve })
+      });
+      if (res.ok) {
+        setEditEmailModal({ open: false, email: null });
+        fetchEmails();
+      } else { const d = await res.json(); alert(d.error || "Failed to save changes."); }
+    } catch { alert("An error occurred."); }
+    finally { setEmailSaving(false); }
+  };
+
+  const handleRegenerateEmail = async () => {
+    if (!regenModal.email) return;
+    setRegenerating(true);
+    try {
+      const res = await fetch(`/api/email-sequences/${regenModal.email.id}/regenerate`, { method: "POST" });
+      if (res.ok) { setRegenModal({ open: false, email: null }); fetchEmails(); }
+      else { const d = await res.json(); alert(d.error || "Failed to regenerate email."); }
+    } catch { alert("An error occurred."); }
+    finally { setRegenerating(false); }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (!bulkModal) return;
+    setBulkProcessing(true);
+    let approved = 0, skipped = 0, errors = 0;
+    try {
+      for (const id of selectedEmailIds) {
+        try {
+          let res: Response;
+          if (bulkModal.action === "approve") {
+            res = await fetch(`/api/email-sequences/${id}/approve`, { method: "POST" });
+          } else if (bulkModal.action === "reject") {
+            res = await fetch(`/api/email-sequences/${id}/reject`, { method: "POST" });
+          } else {
+            res = await fetch(`/api/email-sequences/${id}/regenerate`, { method: "POST" });
+          }
+          if (res.ok) approved++;
+          else skipped++;
+        } catch { errors++; }
+      }
+      setBulkModal(null);
+      setSelectedEmailIds([]);
+      fetchEmails();
+      alert(`Done: ${approved} ${bulkModal.action}d, ${skipped} skipped, ${errors} errors.`);
+    } catch { alert("An error occurred during bulk action."); }
+    finally { setBulkProcessing(false); }
+  };
+
+  // ─── Filters ──────────────────────────────────────────────────────────────
   const filteredCampaigns = campaigns.filter(c => {
     if (campaignFilter !== "All" && c.status !== campaignFilter) return false;
     if (campaignSearch) {
-      const term = campaignSearch.toLowerCase();
-      return (c.name?.toLowerCase().includes(term) || c.targetAudience?.toLowerCase().includes(term) || c.campaignType?.toLowerCase().includes(term));
+      const t = campaignSearch.toLowerCase();
+      return c.name?.toLowerCase().includes(t) || c.targetAudience?.toLowerCase().includes(t) || c.campaignType?.toLowerCase().includes(t);
     }
     return true;
   });
 
-  const filteredEmails = pendingEmails.filter(e => {
-    if (emailFilter !== "All" && e.approvalStatus !== emailFilter) return false;
-    if (emailSearch) {
-      const term = emailSearch.toLowerCase();
-      return (e.campaign?.name?.toLowerCase().includes(term) || e.lead?.businessName?.toLowerCase().includes(term) || e.subject?.toLowerCase().includes(term));
-    }
-    return true;
-  });
+  const uniqueCampaigns = Array.from(new Set(pendingEmails.map(e => e.campaignId)))
+    .map(id => pendingEmails.find(e => e.campaignId === id)?.campaign).filter(Boolean);
+  const uniqueSteps = Array.from(new Set(pendingEmails.map(e => e.sequenceStep))).sort((a, b) => a - b);
 
+  const validLeads = wizardLeads.filter(l => l.email && l.email.includes("@") && l.status !== "Unsubscribed");
+  const invalidLeads = wizardLeads.filter(l => !l.email || !l.email.includes("@"));
+  const unsubscribedLeads = wizardLeads.filter(l => l.status === "Unsubscribed");
+  const filteredWizardLeads = validLeads.filter(l =>
+    !wizardLeadSearch || l.businessName.toLowerCase().includes(wizardLeadSearch.toLowerCase()) || (l.email || "").toLowerCase().includes(wizardLeadSearch.toLowerCase())
+  );
+
+  const activeSteps = wizardData.sequenceSteps.filter(s => s.enabled).length;
+  const totalDraftCount = selectedLeadIds.length * activeSteps;
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header Section */}
+      {/* ── Header ── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white mb-2">AI Email Agent</h2>
-          <p className="text-slate-400 max-w-2xl">Create recruitment campaigns, generate personalized email sequences, review AI drafts, and manage replies from one place.</p>
+          <p className="text-slate-400 max-w-2xl">Create campaigns, select leads, generate AI email drafts, review them, and launch safely. Nothing sends without your approval.</p>
         </div>
-        <div className="flex space-x-3">
-          <button onClick={() => setActiveTab("hub")} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700">
+        <div className="flex gap-3 flex-wrap">
+          <button id="btn-view-campaigns" onClick={() => setActiveTab("hub")} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700 text-sm">
             View All Campaigns
           </button>
-          <button onClick={() => { setShowModal(true); setNewCampaign(defaultCampaign); setEditingCampaignId(null); }} className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-purple-500/25">
-            <Plus size={18} />
-            <span>Create Campaign</span>
+          <button id="btn-create-campaign" onClick={openWizard} className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-purple-500/25 text-sm">
+            <Plus size={16} /> Create Campaign
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       <div className="flex space-x-1 border-b border-slate-800">
-        <button onClick={() => setActiveTab("hub")} className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === "hub" ? "border-purple-500 text-purple-400" : "border-transparent text-slate-400 hover:text-slate-300"}`}>
-          Campaign Hub
-        </button>
-        <button onClick={() => setActiveTab("pending")} className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === "pending" ? "border-purple-500 text-purple-400" : "border-transparent text-slate-400 hover:text-slate-300"}`}>
-          Pending Email Reviews
-        </button>
+        {[["hub", "Campaign Hub"], ["pending", "Pending Email Reviews"]].map(([tab, label]) => (
+          <button key={tab} onClick={() => setActiveTab(tab as "hub" | "pending")}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === tab ? "border-purple-500 text-purple-400" : "border-transparent text-slate-400 hover:text-slate-300"}`}>
+            {label}
+            {tab === "pending" && pendingEmails.filter(e => e.approvalStatus === "Pending").length > 0 && (
+              <span className="ml-2 bg-amber-500/20 text-amber-400 text-xs px-1.5 py-0.5 rounded-full border border-amber-500/20">
+                {pendingEmails.filter(e => e.approvalStatus === "Pending").length}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Campaign Hub Tab */}
+      {/* ══════════════════════ CAMPAIGN HUB ══════════════════════ */}
       {activeTab === "hub" && (
-        <div className="space-y-4 animate-in fade-in">
-          <div className="flex flex-col md:flex-row justify-between gap-4">
-            <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 w-full md:w-80">
-              <Search size={16} className="text-slate-400" />
-              <input type="text" value={campaignSearch} onChange={(e) => setCampaignSearch(e.target.value)} placeholder="Search campaigns..." className="bg-transparent border-none outline-none ml-2 w-full text-sm text-white placeholder-slate-500" />
+        <div className="space-y-4">
+          {/* Search + filter bar */}
+          <div className="flex flex-col md:flex-row justify-between gap-3">
+            <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 w-full md:w-72">
+              <Search size={15} className="text-slate-400 shrink-0" />
+              <input type="text" value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)}
+                placeholder="Search campaigns..." className="bg-transparent border-none outline-none ml-2 w-full text-sm text-white placeholder-slate-500" />
             </div>
-            <div className="flex items-center space-x-2 overflow-x-auto">
-              {["All", "Draft", "Active", "Paused", "Completed"].map(filter => (
-                <button key={filter} onClick={() => setCampaignFilter(filter)} className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border ${campaignFilter === filter ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>
-                  {filter}
+            <div className="flex items-center gap-2 flex-wrap">
+              {["All", "Draft", "Pending Review", "Active", "Paused", "Completed"].map(f => (
+                <button key={f} onClick={() => setCampaignFilter(f)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${campaignFilter === f ? "bg-purple-500/20 text-purple-400 border-purple-500/30" : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"}`}>
+                  {f}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="glass rounded-2xl border border-slate-700/50 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-900/50 text-slate-400 border-b border-slate-800">
-                  <tr>
-                    <th className="px-6 py-4 font-medium">Campaign</th>
-                    <th className="px-6 py-4 font-medium">Audience / Offer</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium">Performance</th>
-                    <th className="px-6 py-4 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {fetchingCampaigns ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <tr key={i} className="animate-pulse">
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-32 mb-2"></div><div className="h-3 bg-slate-800 rounded w-20"></div></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-24 mb-2"></div><div className="h-3 bg-slate-800 rounded w-32"></div></td>
-                        <td className="px-6 py-4"><div className="h-6 bg-slate-800 rounded-full w-16"></div></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-full"></div></td>
-                        <td className="px-6 py-4"><div className="h-8 bg-slate-800 rounded w-full"></div></td>
-                      </tr>
-                    ))
-                  ) : filteredCampaigns.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-16 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <div className="w-16 h-16 bg-slate-800/50 text-slate-500 flex items-center justify-center rounded-full mb-4"><Target size={32} /></div>
-                          <h3 className="text-lg font-medium text-white mb-2">No recruitment campaigns yet</h3>
-                          <p className="text-slate-400 max-w-sm mb-6">Create your first AI-powered recruitment campaign to generate personalized email sequences.</p>
-                          <button onClick={() => { setShowModal(true); setNewCampaign(defaultCampaign); setEditingCampaignId(null); }} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors">
-                            Create Campaign
+          {/* Campaign cards */}
+          {fetchingCampaigns ? (
+            <div className="grid gap-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 animate-pulse">
+                  <div className="h-5 bg-slate-800 rounded w-48 mb-3"></div>
+                  <div className="h-3 bg-slate-800 rounded w-64 mb-2"></div>
+                  <div className="h-3 bg-slate-800 rounded w-32"></div>
+                </div>
+              ))}
+            </div>
+          ) : filteredCampaigns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-20 h-20 bg-purple-500/10 rounded-2xl flex items-center justify-center mb-5 border border-purple-500/20">
+                <Target size={36} className="text-purple-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">No campaigns yet</h3>
+              <p className="text-slate-400 max-w-sm mb-6">Create your first AI-powered outreach campaign and review emails before sending.</p>
+              <button onClick={openWizard} className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors">
+                Create Campaign
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {filteredCampaigns.map(camp => {
+                const nextAction = getNextAction(camp);
+                const leads = camp._count?.campaignLeads ?? camp._count?.leads ?? 0;
+                return (
+                  <div key={camp.id} className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-5 hover:border-purple-500/30 transition-all">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      {/* Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1 flex-wrap">
+                          <h3 className="font-bold text-white text-base truncate">{camp.name}</h3>
+                          <StatusBadge status={camp.status} />
+                          <span className="text-xs text-slate-600 bg-slate-800 px-2 py-0.5 rounded">{camp.campaignType || "Outreach"}</span>
+                        </div>
+                        <p className="text-sm text-slate-400 truncate mb-2">{camp.targetAudience || "Target audience not set"} • {camp.offer || "No offer set"}</p>
+                        {/* Stats row */}
+                        <div className="flex items-center gap-5 text-xs flex-wrap">
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <Users size={12} className="text-slate-500" />
+                            <span className="font-medium text-slate-200">{leads}</span> leads
+                          </div>
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <Mail size={12} className="text-slate-500" />
+                            <span className="font-medium text-slate-200">{camp.totalDrafts ?? 0}</span> drafts
+                          </div>
+                          {(camp.pendingReview ?? 0) > 0 && (
+                            <div className="flex items-center gap-1 text-amber-400">
+                              <AlertCircle size={12} />
+                              <span className="font-medium">{camp.pendingReview}</span> pending review
+                            </div>
+                          )}
+                          {(camp.approvedEmail1 ?? 0) > 0 && (
+                            <div className="flex items-center gap-1 text-green-400">
+                              <CheckCircle2 size={12} />
+                              <span className="font-medium">{camp.approvedEmail1}</span> Email 1 approved
+                            </div>
+                          )}
+                          {(camp._count?.replies ?? 0) > 0 && (
+                            <div className="flex items-center gap-1 text-blue-400">
+                              <MessageSquare size={12} />
+                              <span className="font-medium">{camp._count?.replies}</span> replies
+                            </div>
+                          )}
+                        </div>
+                        {/* Next action */}
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <span className="text-xs text-slate-500">Next:</span>
+                          <button
+                            id={`btn-next-action-${camp.id}`}
+                            onClick={() => {
+                              if (nextAction.action === "start") setStartConfirmId(camp.id);
+                              else if (nextAction.action === "resume") handleResumeCampaign(camp.id);
+                              else if (nextAction.action === "generate") setGenerateModalId(camp.id);
+                              else if (nextAction.action === "review") { setActiveTab("pending"); setEmailCampaignFilter(camp.id); }
+                              else if (nextAction.action === "edit") { setEditCampaign(camp); setEditModalOpen(true); }
+                              else if (nextAction.action === "settings") { window.location.href = "/dashboard/settings"; }
+                              else if (nextAction.action === "replies") { window.location.href = "/dashboard/replies"; }
+                              else if (nextAction.action === "addLeads") { setActiveTab("pending"); }
+                            }}
+                            className="text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1 transition-colors">
+                            <ArrowRight size={12} /> {nextAction.label}
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCampaigns.map((camp) => (
-                      <tr key={camp.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-white mb-1">{camp.name}</div>
-                          <div className="text-xs text-slate-500 flex items-center space-x-1">
-                            <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-300">{camp.campaignType || "Outreach"}</span>
-                            <span>• {new Date(camp.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-slate-300">{camp.targetAudience || "General"}</div>
-                          <div className="text-xs text-slate-500 truncate max-w-[200px]">{camp.offer || "No specific offer"}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                            camp.status === 'Active' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                            camp.status === 'Paused' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                            camp.status === 'Archived' ? 'bg-slate-800 text-slate-400 border-slate-700' :
-                            'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                          }`}>
-                            {camp.status || "Draft"}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-1.5 flex-wrap lg:flex-nowrap shrink-0">
+                        {camp.status !== "Active" ? (
+                          <button id={`btn-start-${camp.id}`} onClick={() => setStartConfirmId(camp.id)}
+                            className="px-3 py-1.5 bg-green-500/10 text-green-400 text-xs font-medium rounded-lg hover:bg-green-500/20 border border-green-500/20 flex items-center gap-1">
+                            <Play size={13} /> Start
+                          </button>
+                        ) : (
+                          <button id={`btn-pause-${camp.id}`} onClick={() => handlePauseCampaign(camp.id)}
+                            className="px-3 py-1.5 bg-yellow-500/10 text-yellow-400 text-xs font-medium rounded-lg hover:bg-yellow-500/20 border border-yellow-500/20 flex items-center gap-1">
+                            <Pause size={13} /> Pause
+                          </button>
+                        )}
+                        <button id={`btn-generate-${camp.id}`} onClick={() => setGenerateModalId(camp.id)}
+                          className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg hover:bg-purple-500/20 border border-purple-500/20" title="Generate Emails">
+                          <Sparkles size={15} />
+                        </button>
+                        <button id={`btn-review-${camp.id}`} onClick={() => { setActiveTab("pending"); setEmailCampaignFilter(camp.id); }}
+                          className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 border border-blue-500/20" title="Review Emails">
+                          <Mail size={15} />
+                        </button>
+                        <button id={`btn-edit-${camp.id}`} onClick={() => { setEditCampaign(camp); setEditModalOpen(true); }}
+                          className="p-1.5 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 border border-slate-700" title="Edit Campaign">
+                          <Edit2 size={15} />
+                        </button>
+                        <Link href={`/dashboard/campaigns/${camp.id}`}>
+                          <span id={`btn-view-${camp.id}`} className="p-1.5 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 border border-slate-700 flex" title="View Sequence">
+                            <FileText size={15} />
                           </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex space-x-4 text-xs">
-                            <div className="flex flex-col"><span className="text-slate-500">Leads</span><span className="font-medium text-white">{camp._count?.leads || 0}</span></div>
-                            <div className="flex flex-col"><span className="text-slate-500">Emails</span><span className="font-medium text-white">{camp._count?.emailSequences || 0}</span></div>
-                            <div className="flex flex-col"><span className="text-slate-500">Replies</span><span className="font-medium text-white">{camp._count?.replies || 0}</span></div>
-                            <div className="flex flex-col"><span className="text-green-500">Booked</span><span className="font-medium text-green-400">{camp._count?.bookedCalls || 0}</span></div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end space-x-2">
-                            {camp.status !== 'Active' ? (
-                              <button onClick={() => updateStatus(camp.id, 'Active')} className="p-1.5 bg-green-500/10 text-green-400 rounded hover:bg-green-500/20" title="Resume/Start"><Play size={16} /></button>
-                            ) : (
-                              <button onClick={() => updateStatus(camp.id, 'Paused')} className="p-1.5 bg-yellow-500/10 text-yellow-400 rounded hover:bg-yellow-500/20" title="Pause"><Pause size={16} /></button>
-                            )}
-                            <button onClick={() => handleGenerateEmails(camp.id)} className="p-1.5 bg-purple-500/10 text-purple-400 rounded hover:bg-purple-500/20 flex items-center space-x-1" title="Generate Emails"><Sparkles size={16} /></button>
-                            <Link href={`/dashboard/campaigns/${camp.id}`} className="p-1.5 bg-blue-500/10 text-blue-400 rounded hover:bg-blue-500/20" title="Open Sequence"><FileText size={16} /></Link>
-                            <button onClick={() => { setNewCampaign(camp); setEditingCampaignId(camp.id); setShowModal(true); }} className="p-1.5 bg-slate-800 text-slate-400 rounded hover:bg-slate-700" title="Edit"><Edit2 size={16} /></button>
-                            <button onClick={() => deleteCampaign(camp.id, camp._count?.emailSequences || 0)} className="p-1.5 bg-red-500/10 text-red-400 rounded hover:bg-red-500/20" title="Delete"><Trash2 size={16} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                        </Link>
+                        <button id={`btn-delete-${camp.id}`} onClick={() => {
+                          setDeleteModalId(camp.id);
+                          setDeleteHasSent((camp._count?.emailSequences ?? 0) > 0);
+                        }}
+                          className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 border border-red-500/20" title="Delete Campaign">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Pending Email Reviews Tab */}
+      {/* ══════════════════════ PENDING EMAIL REVIEWS ══════════════════════ */}
       {activeTab === "pending" && (
-        <div className="space-y-4 animate-in fade-in">
-          <div className="flex flex-col md:flex-row justify-between gap-4">
-            <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 w-full md:w-80">
-              <Search size={16} className="text-slate-400" />
-              <input type="text" value={emailSearch} onChange={(e) => setEmailSearch(e.target.value)} placeholder="Search pending emails..." className="bg-transparent border-none outline-none ml-2 w-full text-sm text-white placeholder-slate-500" />
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 w-full md:w-72">
+                <Search size={15} className="text-slate-400 shrink-0" />
+                <input type="text" value={emailSearch} onChange={e => setEmailSearch(e.target.value)}
+                  placeholder="Search by lead, subject, campaign..." className="bg-transparent border-none outline-none ml-2 w-full text-sm text-white placeholder-slate-500" />
+              </div>
+              <div className="flex gap-2 flex-wrap items-center">
+                {["All", "Pending", "Approved", "Rejected", "Edited", "High Spam Risk", "Failed Generation"].map(f => (
+                  <button key={f} onClick={() => setEmailFilter(f)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${emailFilter === f ? "bg-purple-500/20 text-purple-400 border-purple-500/30" : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"}`}>
+                    {f}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-slate-400">Filters:</span>
-              {["All", "Pending", "Approved", "Draft", "Failed"].map(filter => (
-                <button key={filter} onClick={() => setEmailFilter(filter)} className={`px-3 py-1.5 rounded-full text-xs font-medium border ${emailFilter === filter ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>
-                  {filter}
-                </button>
-              ))}
+            <div className="flex gap-2 flex-wrap">
+              <select value={emailCampaignFilter} onChange={e => setEmailCampaignFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-1.5 outline-none">
+                <option value="All">All Campaigns</option>
+                {uniqueCampaigns.map((c: any) => c && <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <select value={emailStepFilter} onChange={e => setEmailStepFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-1.5 outline-none">
+                <option value="All">All Steps</option>
+                {uniqueSteps.map(s => <option key={s} value={s.toString()}>Step {s}</option>)}
+              </select>
+              <button onClick={fetchEmails} className="px-3 py-1.5 bg-slate-800 text-slate-400 text-xs rounded-lg hover:bg-slate-700 border border-slate-700 flex items-center gap-1">
+                <RefreshCw size={12} /> Refresh
+              </button>
             </div>
           </div>
 
-          <div className="glass rounded-2xl border border-slate-700/50 overflow-hidden">
+          {/* Bulk action bar */}
+          <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+            <div className="flex items-center gap-3">
+              <input type="checkbox"
+                checked={selectedEmailIds.length === pendingEmails.length && pendingEmails.length > 0}
+                onChange={() => setSelectedEmailIds(selectedEmailIds.length === pendingEmails.length && pendingEmails.length > 0 ? [] : pendingEmails.map(e => e.id))}
+                className="w-4 h-4 rounded border-slate-600 cursor-pointer" />
+              <span className="text-sm text-slate-300">
+                {selectedEmailIds.length > 0 ? `${selectedEmailIds.length} selected` : "Select drafts"}
+              </span>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button id="btn-bulk-approve"
+                onClick={() => selectedEmailIds.length ? setBulkModal({ open: true, action: "approve", count: selectedEmailIds.length }) : alert("Select drafts first.")}
+                disabled={selectedEmailIds.length === 0}
+                className="px-3 py-1.5 bg-green-500/10 text-green-400 text-xs font-medium rounded-lg hover:bg-green-500/20 disabled:opacity-40 disabled:cursor-not-allowed border border-green-500/20 flex items-center gap-1">
+                <Check size={13} /> Approve Selected
+              </button>
+              <button id="btn-bulk-reject"
+                onClick={() => selectedEmailIds.length ? setBulkModal({ open: true, action: "reject", count: selectedEmailIds.length }) : alert("Select drafts first.")}
+                disabled={selectedEmailIds.length === 0}
+                className="px-3 py-1.5 bg-red-500/10 text-red-400 text-xs font-medium rounded-lg hover:bg-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed border border-red-500/20 flex items-center gap-1">
+                <X size={13} /> Reject Selected
+              </button>
+              <button id="btn-bulk-regenerate"
+                onClick={() => selectedEmailIds.length ? setBulkModal({ open: true, action: "regenerate", count: selectedEmailIds.length }) : alert("Select drafts first.")}
+                disabled={selectedEmailIds.length === 0}
+                className="px-3 py-1.5 bg-purple-500/10 text-purple-400 text-xs font-medium rounded-lg hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed border border-purple-500/20 flex items-center gap-1">
+                <RefreshCw size={13} /> Regenerate Selected
+              </button>
+              <button id="btn-clear-selection"
+                onClick={() => setSelectedEmailIds([])}
+                disabled={selectedEmailIds.length === 0}
+                className="px-3 py-1.5 bg-slate-700 text-slate-300 text-xs rounded-lg hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed">
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Email table */}
+          <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-900/50 text-slate-400 border-b border-slate-800">
+              <table className="w-full text-sm text-left text-slate-300">
+                <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800 text-xs">
                   <tr>
-                    <th className="px-6 py-4 font-medium">Business / Campaign</th>
-                    <th className="px-6 py-4 font-medium">Email Preview</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium text-right">Actions</th>
+                    <th className="px-4 py-3 w-10"></th>
+                    <th className="px-4 py-3 font-medium">Lead / Campaign</th>
+                    <th className="px-4 py-3 font-medium">Email Preview</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Scores</th>
+                    <th className="px-4 py-3 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {fetchingEmails ? (
-                    Array.from({ length: 3 }).map((_, i) => (
+                    [1, 2, 3].map(i => (
                       <tr key={i} className="animate-pulse">
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-24 mb-2"></div><div className="h-3 bg-slate-800 rounded w-16"></div></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-3/4 mb-2"></div><div className="h-3 bg-slate-800 rounded w-full"></div></td>
-                        <td className="px-6 py-4"><div className="h-6 bg-slate-800 rounded-full w-16"></div></td>
-                        <td className="px-6 py-4"><div className="h-8 bg-slate-800 rounded w-full"></div></td>
+                        {[1, 2, 3, 4, 5, 6].map(j => <td key={j} className="px-4 py-4"><div className="h-3 bg-slate-800 rounded w-full"></div></td>)}
                       </tr>
                     ))
-                  ) : filteredEmails.length === 0 ? (
+                  ) : pendingEmails.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-16 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <div className="w-16 h-16 bg-slate-800/50 text-slate-500 flex items-center justify-center rounded-full mb-4"><Mail size={32} /></div>
-                          <h3 className="text-lg font-medium text-white mb-2">No pending email reviews</h3>
-                          <p className="text-slate-400 max-w-sm mb-6">Once AI generates campaign emails, pending drafts will appear here for human approval.</p>
-                          <button onClick={() => setActiveTab("hub")} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 rounded-lg transition-colors">
-                            View Campaigns
+                      <td colSpan={6} className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+                            <Mail size={28} className="text-slate-500" />
+                          </div>
+                          <h3 className="text-lg font-medium text-white mb-2">No emails waiting for review</h3>
+                          <p className="text-slate-400 max-w-sm mb-5">Generate AI email drafts from a campaign to review and approve them here.</p>
+                          <button onClick={() => setActiveTab("hub")} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-lg text-sm">
+                            Go to Campaign Hub
                           </button>
                         </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredEmails.map((email) => (
-                      <tr key={email.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-white">{email.lead?.businessName || "Unknown"}</div>
-                          <div className="text-xs text-slate-500">{email.campaign?.name || "Unknown"}</div>
-                        </td>
-                        <td className="px-6 py-4 max-w-xl">
-                          <div className="font-semibold text-slate-200 mb-1">{email.subject}</div>
-                          <div className="text-xs text-slate-400 line-clamp-2">{email.previewText || email.body}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
-                            {email.approvalStatus}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end space-x-2">
-                            <button className="p-1.5 bg-slate-800 text-slate-400 rounded hover:bg-slate-700" title="Review"><Eye size={16} /></button>
-                            <button className="p-1.5 bg-blue-500/10 text-blue-400 rounded hover:bg-blue-500/20" title="Edit"><Edit2 size={16} /></button>
-                            <button onClick={() => handleApproveEmail(email.id)} className="p-1.5 bg-green-500/10 text-green-400 rounded hover:bg-green-500/20 flex items-center space-x-1" title="Approve">
-                              <Check size={16} /> <span>Approve</span>
-                            </button>
-                            <Link href={`/dashboard/campaigns/${email.campaign?.id}`} className="p-1.5 bg-purple-500/10 text-purple-400 rounded hover:bg-purple-500/20" title="Open Sequence"><FileText size={16} /></Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    pendingEmails.map(email => {
+                      const isEdited = !!(email.editedSubject || email.editedBody);
+                      return (
+                        <tr key={email.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="px-4 py-4">
+                            <input type="checkbox" checked={selectedEmailIds.includes(email.id)}
+                              onChange={() => setSelectedEmailIds(prev => prev.includes(email.id) ? prev.filter(i => i !== email.id) : [...prev, email.id])}
+                              className="w-4 h-4 rounded border-slate-600 cursor-pointer" />
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="font-medium text-white text-sm">{email.lead?.businessName || "Unknown"}</div>
+                            <div className="text-xs text-slate-500">{email.campaign?.name} · Step {email.sequenceStep}</div>
+                            {email.lead?.email && <div className="text-xs text-slate-600 mt-0.5">{email.lead.email}</div>}
+                          </td>
+                          <td className="px-4 py-4 max-w-xs">
+                            <div className="font-medium text-slate-200 text-sm mb-1 truncate">{email.subject}</div>
+                            <div className="text-xs text-slate-500 line-clamp-2">{email.previewText || email.body}</div>
+                            {isEdited && <span className="inline-block mt-1 text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">Edited</span>}
+                          </td>
+                          <td className="px-4 py-4">
+                            <ApprovalBadge status={email.approvalStatus} spamRisk={email.spamRisk} />
+                          </td>
+                          <td className="px-4 py-4">
+                            {email.personalizationScore != null && (
+                              <div className="text-xs text-slate-400">
+                                <span className={email.personalizationScore >= 70 ? "text-green-400" : email.personalizationScore >= 50 ? "text-amber-400" : "text-red-400"}>
+                                  {email.personalizationScore}%
+                                </span> personalized
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <button id={`btn-preview-${email.id}`} onClick={() => setPreviewEmail(email)}
+                                className="p-1.5 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 border border-slate-700" title="Preview">
+                                <Eye size={14} />
+                              </button>
+                              <button id={`btn-edit-email-${email.id}`} onClick={() => {
+                                setEditSubject(email.editedSubject || email.subject);
+                                setEditBody(email.editedBody || email.body);
+                                setEditEmailModal({ open: true, email });
+                              }}
+                                className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 border border-blue-500/20" title="Edit">
+                                <Edit2 size={14} />
+                              </button>
+                              <button id={`btn-approve-${email.id}`} onClick={() => handleApproveEmail(email.id)}
+                                className="p-1.5 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 border border-green-500/20" title="Approve">
+                                <Check size={14} />
+                              </button>
+                              <button id={`btn-reject-${email.id}`} onClick={() => handleRejectEmail(email.id)}
+                                className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 border border-red-500/20" title="Reject">
+                                <X size={14} />
+                              </button>
+                              <button id={`btn-regen-${email.id}`} onClick={() => setRegenModal({ open: true, email })}
+                                className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg hover:bg-purple-500/20 border border-purple-500/20" title="Regenerate">
+                                <RefreshCw size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -392,71 +901,720 @@ export default function AIEmailAgentPage() {
         </div>
       )}
 
-      {/* Campaign Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="glass bg-slate-900 border border-slate-700/50 p-6 rounded-2xl w-full max-w-2xl shadow-2xl my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white">{editingCampaignId ? "Edit Recruitment Campaign" : "Create Recruitment Campaign"}</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white"><X size={20} /></button>
-            </div>
-            
-            <form onSubmit={handleSaveCampaign} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Campaign Name</label>
-                  <input type="text" required value={newCampaign.name} onChange={e => setNewCampaign({...newCampaign, name: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" placeholder="e.g. Senior Tech Roles" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Campaign Type</label>
-                  <select value={newCampaign.campaignType} onChange={e => setNewCampaign({...newCampaign, campaignType: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white">
-                    {["Client Outreach", "Hiring Company Outreach", "Candidate Outreach", "Staffing Outreach", "Executive Search Outreach", "HR Consultancy Outreach", "Re-Engagement"].map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Target Audience</label>
-                  <input type="text" value={newCampaign.targetAudience} onChange={e => setNewCampaign({...newCampaign, targetAudience: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" placeholder="e.g. CTOs in Fintech" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Industry / Niche</label>
-                  <input type="text" value={newCampaign.industry} onChange={e => setNewCampaign({...newCampaign, industry: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" placeholder="e.g. Fintech, Healthcare" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Recruitment Service / Offer</label>
-                  <input type="text" value={newCampaign.offer} onChange={e => setNewCampaign({...newCampaign, offer: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" placeholder="e.g. 15% flat fee, exclusive senior candidates" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Tone</label>
-                  <select value={newCampaign.tone} onChange={e => setNewCampaign({...newCampaign, tone: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white">
-                    {["Friendly", "Professional", "Direct", "Premium", "Casual"].map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">CTA Type</label>
-                  <select value={newCampaign.ctaType} onChange={e => setNewCampaign({...newCampaign, ctaType: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white">
-                    {["Book Discovery Call", "Reply", "Candidate Screening Call", "Ask Hiring Need", "Share Candidate Requirement"].map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">CTA / Calendar Link</label>
-                  <input type="url" value={newCampaign.ctaLink} onChange={e => setNewCampaign({...newCampaign, ctaLink: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" placeholder="https://calendly.com/..." />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Sending Mode</label>
-                  <select value={newCampaign.sendingMode} onChange={e => setNewCampaign({...newCampaign, sendingMode: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white">
-                    {["Human Approval Mode", "AI Auto-Send Mode"].map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
+      {/* ══════════════════════ MODALS ══════════════════════ */}
+
+      {/* ── Create Campaign Wizard ── */}
+      {wizardOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col" style={{ maxHeight: "90vh" }}>
+            {/* Wizard header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-white">Create Campaign</h3>
+                <div className="flex gap-1.5 mt-2">
+                  {[1, 2, 3, 4, 5, 6].map(s => (
+                    <div key={s} className={`h-1 rounded-full transition-all ${s === wizardStep ? "w-8 bg-purple-500" : s < wizardStep ? "w-4 bg-purple-800" : "w-4 bg-slate-700"}`} />
+                  ))}
                 </div>
               </div>
+              <button onClick={closeWizard} className="text-slate-400 hover:text-white p-1 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
 
-              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-800">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={creating} className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2">
-                  {creating && <Loader2 size={16} className="animate-spin" />}
-                  <span>{editingCampaignId ? "Save Changes" : "Create Campaign"}</span>
+            {/* Wizard body */}
+            <div className="overflow-y-auto flex-1 p-6">
+
+              {/* STEP 1 — Campaign Basics */}
+              {wizardStep === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-white mb-1">Step 1 — Campaign Basics</h4>
+                    <p className="text-sm text-slate-400">Tell AI who this campaign is for and what outcome you want.</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InputField label="Campaign Name" required helper="e.g. Senior Tech Roles Q3">
+                      <input type="text" value={wizardData.name}
+                        onChange={e => setWizardData(d => ({ ...d, name: e.target.value }))}
+                        placeholder="e.g. Senior Tech Roles Q3"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="Campaign Type">
+                      <select value={wizardData.campaignType} onChange={e => setWizardData(d => ({ ...d, campaignType: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm">
+                        {["Client Outreach", "Hiring Company Outreach", "Candidate Outreach", "Staffing Outreach", "Executive Search Outreach", "HR Consultancy Outreach", "Re-Engagement"].map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    </InputField>
+                    <InputField label="Campaign Goal" helper="What do you want to achieve?">
+                      <input type="text" value={wizardData.goal}
+                        onChange={e => setWizardData(d => ({ ...d, goal: e.target.value }))}
+                        placeholder="e.g. Book discovery calls with hiring managers"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="Language">
+                      <select value={wizardData.language} onChange={e => setWizardData(d => ({ ...d, language: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm">
+                        {["English", "Spanish", "French", "German", "Portuguese"].map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    </InputField>
+                    <InputField label="Tone">
+                      <select value={wizardData.tone} onChange={e => setWizardData(d => ({ ...d, tone: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm">
+                        {["Professional", "Friendly", "Confident", "Consultative"].map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    </InputField>
+                    <InputField label="Sender Email" helper="Email address emails will come from">
+                      <input type="email" value={wizardData.senderEmail}
+                        onChange={e => setWizardData(d => ({ ...d, senderEmail: e.target.value }))}
+                        placeholder="e.g. john@youragency.com"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2 — Select Leads */}
+              {wizardStep === 2 && (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-white mb-1">Step 2 — Select Leads</h4>
+                    <p className="text-sm text-slate-400">Choose leads that should receive this campaign. Leads without valid emails are skipped.</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+                      <div className="text-2xl font-bold text-green-400">{validLeads.length}</div>
+                      <div className="text-slate-400 mt-0.5">Valid email leads</div>
+                    </div>
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                      <div className="text-2xl font-bold text-amber-400">{invalidLeads.length}</div>
+                      <div className="text-slate-400 mt-0.5">No valid email</div>
+                    </div>
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl p-3">
+                      <div className="text-2xl font-bold text-slate-400">{unsubscribedLeads.length}</div>
+                      <div className="text-slate-400 mt-0.5">Unsubscribed</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 flex-1">
+                      <Search size={13} className="text-slate-400" />
+                      <input type="text" value={wizardLeadSearch} onChange={e => setWizardLeadSearch(e.target.value)}
+                        placeholder="Search leads..." className="bg-transparent border-none outline-none ml-2 text-sm text-white w-full" />
+                    </div>
+                    <button onClick={() => setSelectedLeadIds(filteredWizardLeads.map(l => l.id))}
+                      className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg">
+                      Select All Valid
+                    </button>
+                    <button onClick={() => setSelectedLeadIds([])}
+                      className="px-3 py-2 bg-slate-700 text-slate-300 text-xs rounded-lg">
+                      Clear
+                    </button>
+                  </div>
+                  <div className="text-sm text-slate-400">
+                    <span className="text-purple-400 font-medium">{selectedLeadIds.length}</span> leads selected
+                  </div>
+                  {wizardLeadsLoading ? (
+                    <div className="text-center py-8 text-slate-500">Loading leads...</div>
+                  ) : validLeads.length === 0 ? (
+                    <div className="text-center py-10">
+                      <div className="text-slate-500 mb-3">No valid leads found</div>
+                      <Link href="/dashboard/generate-leads">
+                        <span className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm">Generate Leads First</span>
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="border border-slate-700 rounded-xl overflow-hidden max-h-52 overflow-y-auto">
+                      {filteredWizardLeads.slice(0, 100).map(lead => (
+                        <label key={lead.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-800/50 cursor-pointer border-b border-slate-800 last:border-0">
+                          <input type="checkbox" checked={selectedLeadIds.includes(lead.id)}
+                            onChange={() => setSelectedLeadIds(prev => prev.includes(lead.id) ? prev.filter(i => i !== lead.id) : [...prev, lead.id])}
+                            className="w-4 h-4 rounded" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{lead.businessName}</div>
+                            <div className="text-xs text-slate-500 truncate">{lead.email} · {lead.category || "Unknown category"}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 3 — Offer and CTA */}
+              {wizardStep === 3 && (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-white mb-1">Step 3 — Offer and CTA</h4>
+                    <p className="text-sm text-slate-400">Give AI your offer and CTA. AI will not invent proof or fake results.</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InputField label="Target Audience" helper="Who exactly is this campaign for?">
+                      <input type="text" value={wizardData.targetAudience}
+                        onChange={e => setWizardData(d => ({ ...d, targetAudience: e.target.value }))}
+                        placeholder="e.g. CTOs in Fintech startups"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="Your Offer">
+                      <input type="text" value={wizardData.offer}
+                        onChange={e => setWizardData(d => ({ ...d, offer: e.target.value }))}
+                        placeholder="e.g. 15% flat fee recruitment"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="Problem Solved">
+                      <input type="text" value={wizardData.problemSolved}
+                        onChange={e => setWizardData(d => ({ ...d, problemSolved: e.target.value }))}
+                        placeholder="e.g. Stop wasting time on bad interviews"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="Main Benefit">
+                      <input type="text" value={wizardData.mainBenefit}
+                        onChange={e => setWizardData(d => ({ ...d, mainBenefit: e.target.value }))}
+                        placeholder="e.g. Hire top 1% talent in 14 days"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="Proof / Case Study" helper="Optional. AI will NOT invent proof if left empty." >
+                      <input type="text" value={wizardData.proofCaseStudy}
+                        onChange={e => setWizardData(d => ({ ...d, proofCaseStudy: e.target.value }))}
+                        placeholder="e.g. Helped Stripe hire 5 engineers last quarter"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="CTA Type">
+                      <select value={wizardData.ctaType} onChange={e => setWizardData(d => ({ ...d, ctaType: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm">
+                        {["Book Discovery Call", "Reply to Email", "Candidate Screening Call", "Ask Hiring Need", "Share Candidate Requirement"].map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    </InputField>
+                    <InputField label="Booking Link" required helper="Required before campaign can start">
+                      <input type="url" value={wizardData.bookingLink}
+                        onChange={e => setWizardData(d => ({ ...d, bookingLink: e.target.value }))}
+                        placeholder="https://calendly.com/yourname"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                    <InputField label="Unsubscribe Line" required helper="Required before campaign can start">
+                      <input type="text" value={wizardData.unsubscribeLine}
+                        onChange={e => setWizardData(d => ({ ...d, unsubscribeLine: e.target.value }))}
+                        placeholder="Reply STOP to unsubscribe"
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </InputField>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4 — Email Sequence */}
+              {wizardStep === 4 && (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-white mb-1">Step 4 — Email Sequence</h4>
+                    <p className="text-sm text-slate-400">Choose how many follow-ups AI should create. You can disable any step.</p>
+                  </div>
+                  <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 text-sm text-purple-300">
+                    <strong>{selectedLeadIds.length} leads</strong> × <strong>{activeSteps} emails</strong> = <strong>{totalDraftCount} total drafts</strong> will be created
+                  </div>
+                  <div className="space-y-2">
+                    {wizardData.sequenceSteps.map((step, idx) => (
+                      <div key={step.step} className={`border rounded-xl p-4 transition-all ${step.enabled ? "border-slate-700 bg-slate-800/30" : "border-slate-800 bg-slate-900/30 opacity-50"}`}>
+                        <div className="flex items-center gap-3">
+                          <input type="checkbox" checked={step.enabled}
+                            onChange={() => setWizardData(d => ({
+                              ...d,
+                              sequenceSteps: d.sequenceSteps.map((s, i) => i === idx ? { ...s, enabled: !s.enabled } : s)
+                            }))}
+                            className="w-4 h-4 rounded" />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">Email {step.step}</span>
+                              <span className="text-sm font-medium text-white">{step.name}</span>
+                              <span className="text-xs text-slate-500">Day {step.delayDays}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">{step.purpose}</p>
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            <input type="number" value={step.delayDays} min={idx === 0 ? 0 : 1}
+                              onChange={e => setWizardData(d => ({
+                                ...d,
+                                sequenceSteps: d.sequenceSteps.map((s, i) => i === idx ? { ...s, delayDays: parseInt(e.target.value) || 0 } : s)
+                              }))}
+                              className="w-16 text-center px-2 py-1 rounded-lg text-xs"
+                              disabled={idx === 0} />
+                            <span className="ml-1">days</span>
+                          </div>
+                        </div>
+                        {step.enabled && (
+                          <input type="text" value={step.extraInstruction}
+                            onChange={e => setWizardData(d => ({
+                              ...d,
+                              sequenceSteps: d.sequenceSteps.map((s, i) => i === idx ? { ...s, extraInstruction: e.target.value } : s)
+                            }))}
+                            placeholder="Extra instruction for AI (optional)"
+                            className="mt-2 w-full px-3 py-1.5 rounded-lg text-xs" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {activeSteps === 0 && (
+                    <div className="text-amber-400 text-sm flex items-center gap-2">
+                      <AlertTriangle size={14} /> At least one email step must be enabled.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 5 — AI Writing Style */}
+              {wizardStep === 5 && (
+                <div className="space-y-5">
+                  <div>
+                    <h4 className="text-base font-semibold text-white mb-1">Step 5 — AI Writing Style</h4>
+                    <p className="text-sm text-slate-400">Control how the emails should sound and feel.</p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {[
+                      { label: "Personalization Level", key: "personalizationLevel", options: ["Low", "Medium", "High"] },
+                      { label: "Email Length", key: "emailLength", options: ["Very Short", "Short", "Detailed"] },
+                      { label: "Spam Safety", key: "spamSafety", options: ["Normal", "High"] },
+                      { label: "CTA Style", key: "ctaStyle", options: ["Soft", "Direct"] },
+                      { label: "Tone", key: "tone", options: ["Professional", "Friendly", "Confident", "Consultative"] },
+                    ].map(({ label, key, options }) => (
+                      <div key={key}>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">{label}</label>
+                        <select value={(wizardData as any)[key]} onChange={e => setWizardData(d => ({ ...d, [key]: e.target.value }))} className="w-full px-3 py-2 rounded-xl text-sm">
+                          {options.map(o => <option key={o}>{o}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Daily Sending Limit</label>
+                      <input type="number" value={wizardData.dailyLimit} min={1}
+                        onChange={e => setWizardData(d => ({ ...d, dailyLimit: parseInt(e.target.value) || 50 }))}
+                        className="w-full px-3 py-2 rounded-xl text-sm" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 6 — Review and Generate */}
+              {wizardStep === 6 && (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-white mb-1">Step 6 — Review and Generate</h4>
+                    <p className="text-sm text-slate-400">Review everything before AI creates your drafts. Nothing will be sent yet.</p>
+                  </div>
+                  {generationProgress ? (
+                    <div className="space-y-4">
+                      <div className={`p-4 rounded-xl border ${generationProgress.total === 0 ? "bg-red-500/10 border-red-500/20" : "bg-green-500/10 border-green-500/20"}`}>
+                        <p className="text-sm font-medium text-white">{generationProgress.message}</p>
+                      </div>
+                      {generationProgress.done > 0 && (
+                        <div className="text-sm text-slate-400">
+                          <p>✓ <span className="text-green-400">{generationProgress.done * 5}</span> drafts created for <span className="text-green-400">{generationProgress.done}</span> leads.</p>
+                          <p className="mt-1">Switch to <strong>Pending Email Reviews</strong> to review and approve Email 1 before starting the campaign.</p>
+                        </div>
+                      )}
+                      <button onClick={handleWizardDone}
+                        className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <ArrowRight size={16} /> Go to Pending Email Reviews
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        {[
+                          ["Campaign", wizardData.name], ["Goal", wizardData.goal || "—"],
+                          ["Leads selected", String(selectedLeadIds.length)],
+                          ["Emails per lead", String(activeSteps)],
+                          ["Total drafts", String(totalDraftCount)],
+                          ["Sender email", wizardData.senderEmail || "Not set"],
+                          ["Booking link", wizardData.bookingLink ? "✓ Set" : "⚠ Not set"],
+                          ["Unsubscribe line", wizardData.unsubscribeLine ? "✓ Set" : "⚠ Not set"],
+                          ["AI tone", wizardData.tone], ["Personalization", wizardData.personalizationLevel],
+                          ["Email length", wizardData.emailLength], ["Spam safety", wizardData.spamSafety],
+                        ].map(([label, val]) => (
+                          <div key={label} className="flex justify-between gap-2 py-1.5 border-b border-slate-800">
+                            <span className="text-slate-500 text-xs">{label}</span>
+                            <span className={`text-xs font-medium text-right ${val?.startsWith("⚠") ? "text-amber-400" : "text-white"}`}>{val}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-sm text-blue-300 flex items-start gap-2">
+                        <Info size={15} className="mt-0.5 shrink-0" />
+                        <span>AI will create drafts only. <strong>Nothing will be sent yet.</strong> You must review and approve Email 1 before starting the campaign.</span>
+                      </div>
+                      <button id="btn-wizard-generate" onClick={handleWizardGenerate} disabled={wizardGenerating || activeSteps === 0 || selectedLeadIds.length === 0}
+                        className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                        {wizardGenerating ? <><Loader2 size={17} className="animate-spin" /> Generating AI Drafts...</> : <><Sparkles size={17} /> Create Campaign & Generate AI Emails</>}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Wizard footer */}
+            {!(wizardStep === 6 && generationProgress) && (
+              <div className="p-5 border-t border-slate-800 flex justify-between items-center shrink-0 bg-slate-900/50">
+                <button onClick={() => wizardStep > 1 ? setWizardStep(s => s - 1) : closeWizard()}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm flex items-center gap-1">
+                  <ChevronLeft size={15} /> {wizardStep > 1 ? "Back" : "Cancel"}
+                </button>
+                {wizardStep < 6 && (
+                  <button onClick={handleWizardNext} disabled={wizardSaving || (wizardStep === 4 && activeSteps === 0)}
+                    className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-medium flex items-center gap-1 disabled:opacity-50">
+                    {wizardSaving ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Next <ChevronRight size={15} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Campaign Modal ── */}
+      {editModalOpen && editCampaign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-xl shadow-2xl" style={{ maxHeight: "85vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center shrink-0">
+              <h3 className="text-lg font-bold text-white">Edit Campaign</h3>
+              <button onClick={() => setEditModalOpen(false)} className="text-slate-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleSaveEditCampaign} className="flex flex-col flex-1 overflow-hidden">
+              <div className="overflow-y-auto flex-1 p-5 space-y-4">
+                <InputField label="Campaign Name" required>
+                  <input type="text" required value={editCampaign.name} onChange={e => setEditCampaign(c => c ? { ...c, name: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Target Audience">
+                  <input type="text" value={editCampaign.targetAudience || ""} onChange={e => setEditCampaign(c => c ? { ...c, targetAudience: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Offer">
+                  <input type="text" value={editCampaign.offer || ""} onChange={e => setEditCampaign(c => c ? { ...c, offer: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Booking Link" helper="Required to start campaign">
+                  <input type="url" value={editCampaign.bookingLink || editCampaign.ctaLink || ""} onChange={e => setEditCampaign(c => c ? { ...c, bookingLink: e.target.value, ctaLink: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Unsubscribe Line" helper="Required to start campaign">
+                  <input type="text" value={editCampaign.unsubscribeLine || ""} onChange={e => setEditCampaign(c => c ? { ...c, unsubscribeLine: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Sender Email">
+                  <input type="email" value={editCampaign.senderEmail || ""} onChange={e => setEditCampaign(c => c ? { ...c, senderEmail: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Problem Solved">
+                  <input type="text" value={editCampaign.problemSolved || ""} onChange={e => setEditCampaign(c => c ? { ...c, problemSolved: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Proof / Case Study" helper="Leave empty and AI won't invent proof">
+                  <input type="text" value={editCampaign.proofCaseStudy || ""} onChange={e => setEditCampaign(c => c ? { ...c, proofCaseStudy: e.target.value } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+                <InputField label="Daily Sending Limit">
+                  <input type="number" value={editCampaign.dailyLimit || 50} min={1} onChange={e => setEditCampaign(c => c ? { ...c, dailyLimit: parseInt(e.target.value) } : c)} className="w-full px-3 py-2 rounded-xl text-sm" />
+                </InputField>
+              </div>
+              <div className="p-5 border-t border-slate-800 flex justify-end gap-3 shrink-0 bg-slate-900/50">
+                <button type="button" onClick={() => setEditModalOpen(false)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancel</button>
+                <button type="submit" disabled={editSaving} className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                  {editSaving && <Loader2 size={14} className="animate-spin" />} Save Changes
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirm Modal ── */}
+      {deleteModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center">
+                <Trash2 size={18} className="text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Delete Campaign</h3>
+            </div>
+            <p className="text-slate-400 text-sm">Are you sure you want to delete this campaign?</p>
+            {deleteHasSent && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-sm text-amber-300 flex items-start gap-2">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" /> This campaign has email history. It will be archived instead of deleted.
+              </div>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setDeleteModalId(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancel</button>
+              <button id="btn-confirm-delete" onClick={handleDelete} disabled={deleting}
+                className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                {deleting && <Loader2 size={14} className="animate-spin" />} {deleteHasSent ? "Archive" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generate Emails Confirm Modal ── */}
+      {generateModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center">
+                <Sparkles size={18} className="text-purple-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Generate AI Emails</h3>
+            </div>
+            <p className="text-slate-400 text-sm">AI will create email drafts for all leads in this campaign. Leads that already have drafts will be skipped.</p>
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-sm text-blue-300 flex items-start gap-2">
+              <Info size={14} className="mt-0.5 shrink-0" /> Nothing will be sent. Drafts require your review and approval first.
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setGenerateModalId(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancel</button>
+              <button id="btn-confirm-generate" onClick={() => handleGenerateEmails(generateModalId!)} disabled={generating}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                {generating && <Loader2 size={14} className="animate-spin" />} Generate Emails
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Start Confirm Modal ── */}
+      {startConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center">
+                <Play size={18} className="text-green-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Start this campaign?</h3>
+            </div>
+            <ul className="text-sm text-slate-400 space-y-2">
+              <li className="flex items-start gap-2"><Check size={14} className="text-green-400 mt-0.5 shrink-0" /> Only <strong className="text-green-400">Approved</strong> emails will be scheduled.</li>
+              <li className="flex items-start gap-2"><X size={14} className="text-amber-400 mt-0.5 shrink-0" /> Pending or Rejected emails will not be sent.</li>
+              <li className="flex items-start gap-2"><Shield size={14} className="text-blue-400 mt-0.5 shrink-0" /> Follow-ups stop when a lead replies, unsubscribes, bounces, or books a call.</li>
+            </ul>
+            <div className="flex justify-end gap-3 pt-2">
+              <button id="btn-cancel-start" onClick={() => setStartConfirmId(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancel</button>
+              <button id="btn-confirm-start" onClick={() => handleStartCampaign(startConfirmId!)} disabled={starting}
+                className="px-5 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                {starting && <Loader2 size={14} className="animate-spin" />} <Check size={14} /> Start Campaign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Readiness Checklist Modal ── */}
+      {readinessModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col" style={{ maxHeight: "85vh" }}>
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={18} className="text-amber-400" />
+                <h3 className="text-lg font-bold text-white">Campaign Not Ready</h3>
+              </div>
+              <button onClick={() => setReadinessModal({ open: false, campaignId: null, items: [] })} className="text-slate-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-5 space-y-3">
+              <p className="text-sm text-slate-400">Complete the missing items below before starting this campaign.</p>
+              {readinessModal.items.map(item => (
+                <div key={item.key} className={`flex items-center gap-3 p-4 rounded-xl border ${item.passed ? "bg-emerald-500/5 border-emerald-500/20" : "bg-red-500/5 border-red-500/20"}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.passed ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                    {item.passed ? <Check size={15} strokeWidth={3} /> : <X size={15} strokeWidth={3} />}
+                  </div>
+                  <div className="flex-1">
+                    <div className={`text-sm font-medium ${item.passed ? "text-slate-300" : "text-white"}`}>{item.label}</div>
+                    {!item.passed && <div className="text-xs text-slate-500 mt-0.5">{item.actionHint}</div>}
+                  </div>
+                  {!item.passed && (
+                    <button onClick={() => {
+                      if (item.key === "senderEmail") window.location.href = "/dashboard/settings";
+                      else if (item.key === "email1Generated" && readinessModal.campaignId) setGenerateModalId(readinessModal.campaignId);
+                      else if (item.key === "email1Approved") { setActiveTab("pending"); setReadinessModal(s => ({ ...s, open: false })); }
+                      else if (["bookingLink", "unsubscribeLine"].includes(item.key)) {
+                        const camp = campaigns.find(c => c.id === readinessModal.campaignId);
+                        if (camp) { setEditCampaign(camp); setEditModalOpen(true); }
+                        setReadinessModal(s => ({ ...s, open: false }));
+                      }
+                    }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs rounded-lg border border-slate-700 whitespace-nowrap">
+                      Fix →
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="p-5 border-t border-slate-800 flex justify-end gap-3 bg-slate-800/20 shrink-0">
+              <button onClick={() => setReadinessModal({ open: false, campaignId: null, items: [] })} className="px-4 py-2 bg-slate-700 text-white rounded-xl text-sm">Close</button>
+              <button id="btn-retry-start" onClick={() => { if (readinessModal.campaignId) { setStartConfirmId(readinessModal.campaignId); setReadinessModal({ open: false, campaignId: null, items: [] }); } }}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                <RefreshCw size={14} /> Retry Start
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Preview Email Modal ── */}
+      {previewEmail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col" style={{ maxHeight: "90vh" }}>
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-white">Email Preview</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{previewEmail.campaign?.name} · Step {previewEmail.sequenceStep} · {previewEmail.lead?.businessName}</p>
+              </div>
+              <button onClick={() => setPreviewEmail(null)} className="text-slate-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+              {/* Warnings */}
+              {previewEmail.personalizationScore != null && previewEmail.personalizationScore < 50 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-sm text-amber-300 flex items-start gap-2">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" /> This email has low personalization because lead data is limited.
+                </div>
+              )}
+              {previewEmail.spamRisk === "High" && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-sm text-red-300 flex items-start gap-2">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" /> This email may sound too promotional. Please edit before approving.
+                </div>
+              )}
+              <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+                <div>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">Subject</span>
+                  <p className="text-white font-medium mt-1">{previewEmail.editedSubject || previewEmail.subject}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">Body</span>
+                  <p className="text-slate-300 text-sm mt-1 whitespace-pre-wrap leading-relaxed">{previewEmail.editedBody || previewEmail.body}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-slate-800/30 rounded-xl p-3">
+                  <span className="text-xs text-slate-500">Lead</span>
+                  <p className="text-white font-medium">{previewEmail.lead?.businessName}</p>
+                  <p className="text-slate-400 text-xs">{previewEmail.lead?.email}</p>
+                </div>
+                <div className="bg-slate-800/30 rounded-xl p-3">
+                  <span className="text-xs text-slate-500">Scores</span>
+                  <p className="text-white font-medium">{previewEmail.personalizationScore ?? "N/A"}% personalized</p>
+                  <p className={`text-xs ${previewEmail.spamRisk === "High" ? "text-red-400" : previewEmail.spamRisk === "Medium" ? "text-amber-400" : "text-green-400"}`}>
+                    Spam risk: {previewEmail.spamRisk || "Low"}
+                  </p>
+                </div>
+              </div>
+              {previewEmail.aiGenerationReason && (
+                <div className="bg-slate-800/30 rounded-xl p-3 text-sm">
+                  <span className="text-xs text-slate-500">AI Personalization Reason</span>
+                  <p className="text-slate-300 mt-1">{previewEmail.aiGenerationReason}</p>
+                </div>
+              )}
+              {previewEmail.aiOriginalSubject && previewEmail.editedSubject && (
+                <div className="bg-slate-800/30 rounded-xl p-3 text-sm">
+                  <span className="text-xs text-slate-500">Original AI Subject</span>
+                  <p className="text-slate-400 mt-1 line-through">{previewEmail.aiOriginalSubject}</p>
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-slate-800 flex justify-end gap-3 shrink-0 bg-slate-900/50">
+              <button onClick={() => setPreviewEmail(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Close</button>
+              <button onClick={() => {
+                setEditSubject(previewEmail.editedSubject || previewEmail.subject);
+                setEditBody(previewEmail.editedBody || previewEmail.body);
+                setEditEmailModal({ open: true, email: previewEmail });
+                setPreviewEmail(null);
+              }} className="px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl text-sm flex items-center gap-1">
+                <Edit2 size={14} /> Edit
+              </button>
+              <button onClick={() => { handleApproveEmail(previewEmail.id); setPreviewEmail(null); }}
+                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm flex items-center gap-1">
+                <Check size={14} /> Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Email Modal ── */}
+      {editEmailModal.open && editEmailModal.email && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col" style={{ maxHeight: "90vh" }}>
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-white">Edit Email Draft</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{editEmailModal.email.campaign?.name} · Step {editEmailModal.email.sequenceStep} · {editEmailModal.email.lead?.businessName}</p>
+              </div>
+              <button onClick={() => setEditEmailModal({ open: false, email: null })} className="text-slate-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Subject <span className="text-red-400">*</span></label>
+                <input type="text" value={editSubject} onChange={e => setEditSubject(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm font-medium" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Body <span className="text-red-400">*</span></label>
+                <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={10}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm leading-relaxed resize-none" />
+              </div>
+              {editEmailModal.email.aiOriginalSubject && (
+                <div className="bg-slate-800/30 rounded-xl p-3">
+                  <p className="text-xs text-slate-500 mb-1">Original AI subject:</p>
+                  <p className="text-slate-400 text-sm">{editEmailModal.email.aiOriginalSubject}</p>
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-slate-800 flex justify-between items-center shrink-0 bg-slate-900/50">
+              <button onClick={() => setEditEmailModal({ open: false, email: null })} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancel</button>
+              <div className="flex gap-2">
+                <button id="btn-save-changes" onClick={() => handleSaveEditEmail(false)} disabled={emailSaving}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm flex items-center gap-1">
+                  {emailSaving && <Loader2 size={13} className="animate-spin" />} Save Changes
+                </button>
+                <button id="btn-save-approve" onClick={() => handleSaveEditEmail(true)} disabled={emailSaving}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-medium flex items-center gap-1">
+                  {emailSaving && <Loader2 size={13} className="animate-spin" />} <Check size={14} /> Save & Approve
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Regenerate Confirm Modal ── */}
+      {regenModal.open && regenModal.email && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center">
+                <RefreshCw size={18} className="text-purple-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Regenerate this email?</h3>
+            </div>
+            <p className="text-slate-400 text-sm">This will replace the AI draft using the same campaign and lead details.</p>
+            {(regenModal.email.editedSubject || regenModal.email.editedBody) && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-sm text-amber-300 flex items-start gap-2">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" /> This email has manual edits. Regenerating will replace them with a new AI version.
+              </div>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <button id="btn-cancel-regen" onClick={() => setRegenModal({ open: false, email: null })} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancel</button>
+              <button id="btn-confirm-regen" onClick={handleRegenerateEmail} disabled={regenerating}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-medium flex items-center gap-2">
+                {regenerating && <Loader2 size={14} className="animate-spin" />} <RefreshCw size={14} /> Regenerate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Action Confirm Modal ── */}
+      {bulkModal?.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${bulkModal.action === "approve" ? "bg-green-500/10" : bulkModal.action === "reject" ? "bg-red-500/10" : "bg-purple-500/10"}`}>
+                {bulkModal.action === "approve" ? <Check size={18} className="text-green-400" /> : bulkModal.action === "reject" ? <X size={18} className="text-red-400" /> : <RefreshCw size={18} className="text-purple-400" />}
+              </div>
+              <h3 className="text-lg font-bold text-white capitalize">Bulk {bulkModal.action}</h3>
+            </div>
+            <p className="text-slate-400 text-sm">
+              You are {bulkModal.action === "approve" ? "approving" : bulkModal.action === "reject" ? "rejecting" : "regenerating"} <strong className="text-white">{bulkModal.count} drafts</strong>.
+              {bulkModal.action === "approve" && " Approved drafts may be scheduled when the campaign starts."}
+              {" "}Failed or empty drafts will be skipped.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button id="btn-cancel-bulk" onClick={() => setBulkModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">Cancel</button>
+              <button id="btn-confirm-bulk" onClick={handleBulkConfirm} disabled={bulkProcessing}
+                className={`px-5 py-2 rounded-xl text-sm font-medium text-white flex items-center gap-2 ${bulkModal.action === "approve" ? "bg-green-600 hover:bg-green-500" : bulkModal.action === "reject" ? "bg-red-600 hover:bg-red-500" : "bg-purple-600 hover:bg-purple-500"}`}>
+                {bulkProcessing && <Loader2 size={14} className="animate-spin" />} Confirm
+              </button>
+            </div>
           </div>
         </div>
       )}

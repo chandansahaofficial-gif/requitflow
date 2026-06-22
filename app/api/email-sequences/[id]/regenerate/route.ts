@@ -2,77 +2,135 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const openrouterKey = process.env.OPENROUTER_API_KEY;
-  const openrouterModel = process.env.OPENROUTER_MODEL || "google/gemini-1.5-pro";
+  const openrouterModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-lite';
 
   if (!openrouterKey) {
-    return NextResponse.json({ error: 'OpenRouter API Key is missing in settings' }, { status: 400 });
+    return NextResponse.json({
+      error: 'AI service is not configured. Please add your OpenRouter API key in Settings.'
+    }, { status: 400 });
   }
 
   try {
+    const { id } = await params;
+
     const existing = await prisma.emailSequence.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { lead: true, campaign: true }
     });
 
     if (!existing || existing.userId !== user.id) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Email draft not found.' }, { status: 404 });
     }
 
     const { lead, campaign } = existing;
 
-    const prompt = `You are an expert cold email strategist for recruitment agencies.
-Rewrite the email for step ${existing.sequenceStep} (${existing.name}) for this lead:
+    const proofInstruction = campaign.proofCaseStudy
+      ? `Use this proof/case study if relevant: "${campaign.proofCaseStudy}"`
+      : `No proof provided. Do NOT invent or fabricate any statistics, client names, or results.`;
+
+    const prompt = `You are an expert cold email strategist for a recruitment agency.
+Rewrite Email Step ${existing.sequenceStep} (${existing.name || existing.emailType || 'Follow-up'}) for this lead.
+
+${proofInstruction}
+
+Campaign Context:
+- Goal: ${campaign.goal || 'Book a discovery call'}
+- Offer: ${campaign.offer || 'Recruitment services'}
+- Tone: ${campaign.tone || 'Professional'}
+- Language: ${campaign.language || 'English'}
+- CTA Style: ${campaign.ctaStyle || 'Soft'}
+- Unsubscribe: ${campaign.unsubscribeLine || 'Reply STOP to unsubscribe'}
+- Booking Link: ${campaign.bookingLink || campaign.ctaLink || ''}
+
+Lead Details:
 - Business: ${lead.businessName}
 - Location: ${lead.location || lead.address || 'Unknown'}
 - Category: ${lead.category || 'Unknown'}
-- AI insight: ${lead.aiInsight || 'None'}
-- Campaign goal: ${campaign.goal || 'Book Discovery Call'}
-Make it better, short, and highly personalized. Do not overpromise.
+- AI Insight: ${lead.aiInsight || 'None'}
 
-Return ONLY valid JSON with no markdown blocks. Format:
-{ "subject": "...", "preview_text": "...", "body": "...", "cta_text": "...", "cta_link": "..." }`;
+Rules:
+- Short and human (under 100 words for body)
+- Subject under 8 words
+- One clear CTA
+- No emojis
+- No invented proof or fake results
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
+Return ONLY valid JSON (no markdown):
+{ "subject": "...", "preview_text": "...", "body": "...", "cta_text": "...", "personalization_reason": "..." }`;
+
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${openrouterKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://funnelzen.ai",
-        "X-Title": "FunnelZen AI"
+        'Authorization': `Bearer ${openrouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://funnelzenai.com',
+        'X-Title': 'FunnelZen AI'
       },
       body: JSON.stringify({
         model: openrouterModel,
-        messages: [{ role: "user", content: prompt }]
+        messages: [{ role: 'user', content: prompt }]
       })
     });
 
     const orData = await res.json();
+    if (!orData.choices?.[0]?.message?.content) {
+      throw new Error('AI returned empty response');
+    }
+
     let jsonStr = orData.choices[0].message.content.trim();
-    if (jsonStr.startsWith('```json')) jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-    if (jsonStr.startsWith('```')) jsonStr = jsonStr.replace(/```/g, '').trim();
+    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
+    const startIdx = jsonStr.indexOf('{');
+    const endIdx = jsonStr.lastIndexOf('}');
+    if (startIdx === -1 || endIdx === -1) throw new Error('Invalid AI response format');
+    jsonStr = jsonStr.slice(startIdx, endIdx + 1);
 
     const regenData = JSON.parse(jsonStr);
 
+    if (!regenData.subject || !regenData.body) {
+      throw new Error('AI returned incomplete email data');
+    }
+
+    // Recalculate spam risk
+    const spamWords = ['free', 'guarantee', 'click here', 'urgent', 'act now', 'limited time', 'winner', 'congratulations'];
+    const bodyLower = (regenData.body || '').toLowerCase();
+    const spamHits = spamWords.filter(w => bodyLower.includes(w)).length;
+    const spamRisk = spamHits >= 3 ? 'High' : spamHits >= 1 ? 'Medium' : 'Low';
+
+    // Recalculate personalization score
+    const personalizationScore = lead.aiInsight ? 75 : lead.category ? 60 : 40;
+
     const updated = await prisma.emailSequence.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         subject: regenData.subject,
         previewText: regenData.preview_text,
         body: regenData.body,
         ctaText: regenData.cta_text,
-        ctaLink: regenData.cta_link,
-        aiGenerationReason: "Regenerated via UI"
+        ctaLink: campaign.bookingLink || campaign.ctaLink || existing.ctaLink,
+        aiOriginalSubject: regenData.subject,
+        aiOriginalBody: regenData.body,
+        // Reset manual edits — AI draft replaces them
+        editedSubject: null,
+        editedBody: null,
+        // Reset approval — must re-review after regeneration
+        approvalStatus: 'Pending',
+        approvedAt: null,
+        aiGenerationReason: regenData.personalization_reason || 'Regenerated via UI',
+        personalizationScore,
+        spamRisk,
       }
     });
 
     return NextResponse.json({ success: true, email: updated });
   } catch (error: any) {
-    console.error("Regenerate sequence error:", error);
-    return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 });
+    console.error('Regenerate sequence error:', error);
+    return NextResponse.json({
+      error: 'Something went wrong while regenerating this email. Please try again.'
+    }, { status: 500 });
   }
 }
