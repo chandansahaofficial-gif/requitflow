@@ -263,9 +263,9 @@ export default function AIEmailAgentPage() {
           })
         });
         const data = await res.json();
-        if (!res.ok) { alert(data.error || "Failed to save campaign."); return; }
+        if (!res.ok) throw new Error(data.details ? `${data.error} Details: ${data.details}` : data.error || "Failed to save campaign");
         setWizardCampaignId(data.campaign.id);
-      } catch { alert("An error occurred. Please try again."); return; }
+      } catch (err: any) { alert(err.message || "An error occurred. Please try again."); return; }
       finally { setWizardSaving(false); }
     }
 

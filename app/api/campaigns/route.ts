@@ -76,14 +76,18 @@ export async function POST(req: Request) {
         proofCaseStudy: data.proofCaseStudy,
         unsubscribeLine: data.unsubscribeLine,
         senderEmail: data.senderEmail,
-        dailyLimit: data.dailyLimit ? parseInt(String(data.dailyLimit)) : 50,
-        followUpCount: data.followUpCount ? parseInt(String(data.followUpCount)) : 5,
+        dailyLimit: parseInt(String(data.dailyLimit)) || 50,
+        followUpCount: parseInt(String(data.followUpCount)) || 5,
+        personalizationLevel: data.personalizationLevel,
+        emailLength: data.emailLength,
+        spamSafety: data.spamSafety,
+        ctaStyle: data.ctaStyle,
       }
     });
 
     return NextResponse.json({ campaign });
   } catch (error: any) {
     console.error('Create campaign error:', error);
-    return NextResponse.json({ error: 'Something went wrong while creating your campaign. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: 'Something went wrong while creating your campaign. Please try again.', details: error?.message || String(error) }, { status: 500 });
   }
 }
