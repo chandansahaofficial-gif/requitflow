@@ -31,6 +31,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }, { status: 400 });
     }
 
+    // Fetch user's SMTP delay setting
+    const smtpAccount = await prisma.smtpAccount.findUnique({ where: { userId: user.id } });
+    const delaySeconds = smtpAccount?.delayBetweenEmailsSeconds || 120;
+
     // Schedule approved Step 1 emails for non-unsubscribed leads
     const sequencesToSchedule = await prisma.emailSequence.findMany({
       where: {
@@ -43,10 +47,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     if (sequencesToSchedule.length > 0) {
-      await prisma.emailSequence.updateMany({
-        where: { id: { in: sequencesToSchedule.map(s => s.id) } },
-        data: { status: 'Scheduled' }
-      });
+      let now = new Date();
+      for (let i = 0; i < sequencesToSchedule.length; i++) {
+        const sequence = sequencesToSchedule[i];
+        const scheduledTime = new Date(now.getTime() + (i * delaySeconds * 1000));
+        await prisma.emailSequence.update({
+          where: { id: sequence.id },
+          data: { 
+            status: 'Scheduled',
+            scheduledAt: scheduledTime
+          }
+        });
+      }
     }
 
     const updatedCampaign = await prisma.campaign.update({

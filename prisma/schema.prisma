@@ -152,6 +152,12 @@ model Campaign {
   unsubscribeLine    String?
   senderEmail        String?
   
+  // AI Email Writing Settings
+  personalizationLevel String?
+  emailLength          String?
+  spamSafety           String?
+  ctaStyle             String?
+  
   // 7-step sequence & AI timing settings
   followUpCount               Int      @default(7)
   timingMode                  String   @default("AI Recommended")
@@ -354,6 +360,11 @@ model SmtpAccount {
   fromName           String
   fromEmail          String
   replyToEmail       String?
+  
+  secure             Boolean  @default(true)
+  dailyLimit         Int      @default(10)
+  delayBetweenEmailsSeconds Int @default(120)
+  isVerified         Boolean  @default(false)
   
   status             String   @default("Active") // Active, Failed
   

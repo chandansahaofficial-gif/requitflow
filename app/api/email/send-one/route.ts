@@ -1,21 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { decrypt } from '@/lib/encryption';
-import { sendEmail } from '@/services/email';
+import { sendCampaignEmail } from '@/lib/email-dispatch';
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const settings = await prisma.userSettings.findUnique({ where: { userId: user.id } });
-  if (!settings || !settings.smtpPassEncrypted || !settings.smtpHost || !settings.smtpPort || !settings.smtpUserEncrypted) {
-    return NextResponse.json({ error: 'SMTP settings incomplete' }, { status: 400 });
-  }
-
-  const smtpPass = decrypt(settings.smtpPassEncrypted);
-  const smtpUser = decrypt(settings.smtpUserEncrypted);
-  
   const { sequenceId } = await req.json();
 
   const sequence = await prisma.emailSequence.findUnique({ 
@@ -27,22 +18,46 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Sequence not found or lead has no email' }, { status: 404 });
   }
 
+  if (sequence.approvalStatus !== 'Approved') {
+    return NextResponse.json({ error: 'Only approved emails can be sent.' }, { status: 400 });
+  }
+
+  if (sequence.status === 'Sent') {
+    return NextResponse.json({ error: 'This email has already been sent.' }, { status: 400 });
+  }
+
+  const finalSubject = sequence.editedSubject || sequence.aiOriginalSubject || sequence.subject;
+  const finalBody = sequence.editedBody || sequence.aiOriginalBody || sequence.body;
+
   try {
-    await sendEmail({
-      host: settings.smtpHost,
-      port: parseInt(settings.smtpPort),
-      user: smtpUser,
-      pass: smtpPass,
-      fromName: settings.smtpFromName || (user as any).name,
-      fromEmail: settings.smtpFromEmail || smtpUser,
+    const sendResult = await sendCampaignEmail({
       to: sequence.lead.email,
-      subject: sequence.subject,
-      html: sequence.body.replace(/\n/g, '<br/>'),
+      subject: finalSubject,
+      html: finalBody.replace(/\n/g, '<br/>'),
+      campaignId: sequence.campaignId,
+      leadId: sequence.leadId,
+      emailSequenceId: sequence.id
     });
+
+    if (!sendResult.success) {
+      throw new Error(sendResult.error);
+    }
 
     const updated = await prisma.emailSequence.update({
       where: { id: sequence.id },
       data: { status: 'Sent', sentAt: new Date() }
+    });
+    
+    await prisma.emailSendLog.create({
+      data: {
+        campaignId: sequence.campaignId,
+        leadId: sequence.leadId,
+        emailSequenceId: sequence.id,
+        subject: finalSubject,
+        body: finalBody,
+        status: 'Sent',
+        sentAt: new Date()
+      }
     });
 
     return NextResponse.json({ sequence: updated });

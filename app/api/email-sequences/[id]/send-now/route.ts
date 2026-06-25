@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { sendEmail } from '@/lib/smtp';
+import { sendCampaignEmail } from '@/lib/sendgrid';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -41,12 +41,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const finalBody = sequence.editedBody || sequence.aiOriginalBody || sequence.body;
 
     try {
-      await sendEmail({
-        userId: user.id,
+      const sendResult = await sendCampaignEmail({
         to: sequence.lead.email,
         subject: finalSubject,
-        html: finalBody.replace(/\n/g, '<br/>')
+        html: finalBody.replace(/\n/g, '<br/>'),
+        campaignId: sequence.campaignId,
+        leadId: sequence.leadId,
+        emailSequenceId: sequence.id
       });
+
+      if (!sendResult.success) {
+        throw new Error(sendResult.error);
+      }
 
       const updatedSeq = await prisma.emailSequence.update({
         where: { id: sequence.id },

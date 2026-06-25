@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import nodemailer from 'nodemailer';
-
+import { sendCampaignEmail } from '@/lib/sendgrid';
 export async function POST(req: Request) {
   try {
     // Check authorization (e.g. cron secret)
@@ -22,7 +21,7 @@ export async function POST(req: Request) {
       include: {
         lead: true,
         campaign: true,
-        user: { include: { smtpAccount: true } }
+        user: true
       },
       take: 50 // process in batches of 50
     });
@@ -30,14 +29,8 @@ export async function POST(req: Request) {
     const results = [];
 
     for (const email of dueEmails) {
-      if (!email.user.smtpAccount || email.user.smtpAccount.status !== 'Active') {
-        await prisma.emailSequence.update({
-          where: { id: email.id },
-          data: { status: 'Failed', errorMessage: 'No active SMTP account' }
-        });
-        results.push({ id: email.id, status: 'failed', reason: 'No active SMTP' });
-        continue;
-      }
+      // We no longer check for SMTP account status here.
+      // sendCampaignEmail handles verification internally using SendGrid env variables.
 
       // Check if lead replied or unsubscribed to prevent sending
       if (email.lead.status === 'Replied' || email.lead.status === 'Unsubscribed') {
@@ -50,27 +43,18 @@ export async function POST(req: Request) {
       }
 
       try {
-        const smtp = email.user.smtpAccount;
-        
-        // Setup Nodemailer
-        // Note: Password decryption should happen here if encrypted
-        const transporter = nodemailer.createTransport({
-          host: smtp.smtpHost,
-          port: smtp.smtpPort,
-          secure: smtp.smtpPort === 465,
-          auth: {
-            user: smtp.smtpUserEncrypted, // Mock: assuming plain or decryption handled
-            pass: smtp.smtpPassEncrypted, // Mock: assuming plain or decryption handled
-          }
-        });
-
-        await transporter.sendMail({
-          from: `"${smtp.fromName}" <${smtp.fromEmail}>`,
+        const sendResult = await sendCampaignEmail({
           to: email.lead.email!,
           subject: email.subject,
           html: email.body,
-          replyTo: smtp.replyToEmail || smtp.fromEmail
+          campaignId: email.campaignId,
+          leadId: email.leadId,
+          emailSequenceId: email.id
         });
+
+        if (!sendResult.success) {
+          throw new Error(sendResult.error);
+        }
 
         // Log the send
         await prisma.emailSendLog.create({

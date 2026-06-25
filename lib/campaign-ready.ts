@@ -40,18 +40,24 @@ export async function checkCampaignReadyToStart(
 
   const userSettings = await prisma.userSettings.findUnique({ where: { userId } });
 
-  // 1. Sender email / SMTP check
-  const hasSenderEmail = !!(campaign.senderEmail) || !!(userSettings?.smtpFromEmail);
-  const hasSmtp = !!(userSettings?.smtpHost && userSettings?.smtpUserEncrypted);
-  const senderOk = hasSenderEmail && hasSmtp;
+  // 1. Sender email / SendGrid check
+  const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
+  const hasSendGridEmail = !!process.env.SENDGRID_FROM_EMAIL;
+  
+  const smtpAccount = await prisma.smtpAccount.findUnique({ where: { userId } });
+  const hasVerifiedSmtp = smtpAccount && smtpAccount.isVerified && smtpAccount.status === 'Active';
+
+  const senderOk = hasVerifiedSmtp || (hasSendGridKey && hasSendGridEmail);
+  
   items.push({
     key: 'senderEmail',
     label: 'Sender email connected',
     passed: senderOk,
-    actionHint: 'Connect a sender email in Settings before starting this campaign.'
+    actionHint: 'Connect SMTP or SendGrid before starting this campaign.'
   });
+  
   if (!senderOk) {
-    missingRequirements.push('Configure Sender Email / SMTP in Settings');
+    missingRequirements.push('Connect SMTP or SendGrid before starting.');
   }
 
   // 2. Booking link check
@@ -145,17 +151,20 @@ export async function checkCampaignReadyToStart(
     actionHint: 'Review and approve Email 1 for all leads before starting.'
   });
 
-  // 6. Daily sending limit
-  const dailyLimit = campaign.dailyLimit || userSettings?.dailyEmailLimit || 0;
-  const dailyLimitOk = dailyLimit > 0;
+  // 6. Daily sending limit (from SmtpAccount or Campaign/Settings)
+  const dailyLimitVal = smtpAccount?.dailyLimit || campaign.dailyLimit || userSettings?.dailyEmailLimit || 0;
+  const delaySeconds = smtpAccount?.delayBetweenEmailsSeconds || 120;
+  
+  const dailyLimitOk = dailyLimitVal >= 1 && dailyLimitVal <= 10 && delaySeconds >= 60 && delaySeconds <= 900;
+  
   items.push({
     key: 'dailyLimit',
-    label: 'Daily sending limit configured',
+    label: 'Sending limit configured',
     passed: dailyLimitOk,
-    actionHint: 'Set a valid daily sending limit in campaign or settings.'
+    actionHint: 'Configure Sender'
   });
   if (!dailyLimitOk) {
-    missingRequirements.push('Set a valid daily sending limit');
+    missingRequirements.push('Set sending limit and delay before starting.');
   }
 
   return {

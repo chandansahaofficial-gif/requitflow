@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+// File touched to clear IDE cache
 import { getCurrentUser } from '@/lib/auth';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -8,7 +9,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { id: campaignId } = await params;
   const openrouterKey = process.env.OPENROUTER_API_KEY;
-  const openrouterModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-lite';
+  const openrouterModel = process.env.OPENROUTER_MODEL || 'google/gemini-1.5-pro';
 
   if (!openrouterKey) {
     return NextResponse.json({
@@ -198,6 +199,9 @@ Return ONLY valid JSON array (no markdown, no backticks, no explanation):
         });
 
         const orData = await res.json();
+        if (orData.error) {
+          throw new Error(`OpenRouter Error: ${orData.error.message || JSON.stringify(orData.error)}`);
+        }
         if (!orData.choices?.[0]?.message?.content) {
           throw new Error('AI returned empty response');
         }
@@ -216,7 +220,14 @@ Return ONLY valid JSON array (no markdown, no backticks, no explanation):
         }
 
         // Save each email step
-        for (const seq of sequenceData) {
+        for (let seq of sequenceData) {
+          // Normalize keys to lowercase just in case the AI capitalized them
+          const normalizedSeq: any = {};
+          for (const key in seq) {
+            normalizedSeq[key.toLowerCase()] = seq[key];
+          }
+          seq = normalizedSeq;
+
           if (!seq.subject || !seq.body) continue; // Skip malformed steps
 
           // Basic spam risk heuristic
@@ -233,14 +244,14 @@ Return ONLY valid JSON array (no markdown, no backticks, no explanation):
               userId: user.id,
               campaignId,
               leadId: lead.id,
-              name: seq.name || `Email ${seq.step}`,
+              name: seq.name || `Email ${seq.step || 1}`,
               subject: seq.subject,
               previewText: seq.preview_text,
               body: seq.body,
-              sequenceStep: seq.step,
+              sequenceStep: parseInt(String(seq.step)) || 1,
               ctaText: seq.cta_text,
               ctaLink: seq.cta_link || campaign.bookingLink || campaign.ctaLink || '',
-              delayAmount: seq.delay_days ?? 0,
+              delayAmount: parseInt(String(seq.delay_days)) || 0,
               delayUnit: 'business_days',
               status: 'Draft',
               approvalStatus: campaign.autoApproveEmails ? 'Approved' : 'Pending',
@@ -273,6 +284,8 @@ Return ONLY valid JSON array (no markdown, no backticks, no explanation):
       }
     };
 
+    const failedDetails: any[] = [];
+    
     // Process in small concurrent batches of 5
     const BATCH_SIZE = 5;
     for (let i = 0; i < leads.length; i += BATCH_SIZE) {
@@ -283,17 +296,30 @@ Return ONLY valid JSON array (no markdown, no backticks, no explanation):
         else if (!r.skipped && r.leadId) {
           failedCount++;
           failedLeads.push(r.leadId);
+          failedDetails.push({ leadId: r.leadId, reason: r.reason });
         }
       });
     }
 
+    // Include the first failure reason in the message if it failed completely
+    let finalMessage = `AI created ${successCount * 5} drafts for ${successCount} leads.`;
+    if (successCount === 0 && failedCount === 0) {
+      finalMessage = `All leads already have emails generated. Delete existing drafts to regenerate.`;
+    } else if (failedCount > 0) {
+      finalMessage += ` ${failedCount} leads failed.`;
+    }
+    if (successCount === 0 && failedCount > 0 && failedDetails.length > 0) {
+      finalMessage += ` Error: ${failedDetails[0].reason}`;
+    }
+
     return NextResponse.json({
       success: true,
-      message: `AI created ${successCount * 5} drafts for ${successCount} leads.${failedCount > 0 ? ` ${failedCount} leads failed.` : ''}`,
+      message: finalMessage,
       successCount,
       failedCount,
       totalDrafts: successCount * 5,
-      failedLeads
+      failedLeads,
+      failedDetails
     });
 
   } catch (error: any) {
